@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+/* 东方审美设计系统 */
+@theme {
+  /* 主色调 */
+  --color-cinnabar: #A63434;
+  --color-cinnabar-light: #C94F4F;
+  --color-cinnabar-dark: #872828;
+  
+  /* 中性色 */
+  --color-ink: #2A2622;
+  --color-ink-light: #595E66;
+  --color-paper: #F9F7F2;
+  --color-paper-dark: #EDE8DD;
+  
+  /* 辅助色 */
+  --color-jade: #2D6A4F;
+  --color-jade-light: #40916C;
+  --color-gold: #D4AF37;
+  --color-gold-light: #E5C55C;
+  
+  /* 五行色 */
+  --color-wood: #2D6A4F;
+  --color-fire: #A63434;
+  --color-earth: #D4AF37;
+  --color-metal: #9CA3AF;
+  --color-water: #1E3A5F;
+  
+  /* 字体 */
+  --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+  --font-sans: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 全局样式 */
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  min-height: 100vh;
+}
+
+/* 标题字体 */
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* 动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(166, 52, 52, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(166, 52, 52, 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* 水墨晕染效果 */
+.ink-wash {
+  background: radial-gradient(ellipse at center, transparent 0%, var(--color-paper) 70%);
+}
+
+/* 卡片样式 */
+.card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(42, 38, 34, 0.08);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 8px 30px rgba(42, 38, 34, 0.12);
+  transform: translateY(-2px);
+}
+
+/* 按钮样式 */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-cinnabar), var(--color-cinnabar-dark));
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(166, 52, 52, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(166, 52, 52, 0.4);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-ink);
+  padding: 0.75rem 2rem;
+  border-radius: 9999px;
+  border: 2px solid var(--color-ink-light);
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-cinnabar);
+  color: var(--color-cinnabar);
+}
+
+/* VIP 标识 */
+.vip-badge {
+  background: linear-gradient(135deg, var(--color-gold), var(--color-gold-light));
+  color: var(--color-ink);
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
