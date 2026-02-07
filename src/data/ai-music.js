@@ -7,7 +7,7 @@ export const AI_MUSIC = {
         element: '土',
         title: '大地之韵·AI',
         description: 'AI合成的宫调旋律，厚重稳健，健脾和胃。',
-        src: '/music/guzheng_generic.mp3', // 使用现有音乐模拟
+        src: '/music/guzheng_generic.mp3', // 独特
         duration: '5:30'
     },
     shang: {
@@ -15,7 +15,7 @@ export const AI_MUSIC = {
         element: '金',
         title: '秋风清韵·AI',
         description: 'AI合成的商调旋律，清亮肃静，宣肺理气。',
-        src: '/music/pinghu.mp3',
+        src: '/music/shimian.mp3', // 使用十面埋伏模拟
         duration: '4:45'
     },
     jiao: {
@@ -23,7 +23,7 @@ export const AI_MUSIC = {
         element: '木',
         title: '春生之声·AI',
         description: 'AI合成的角调旋律，舒展生发，疏肝解郁。',
-        src: '/music/guangling.mp3',
+        src: '/music/chunjiang.mp3', // 使用春江花月夜模拟
         duration: '5:15'
     },
     zhi: {
@@ -31,7 +31,7 @@ export const AI_MUSIC = {
         element: '火',
         title: '烈阳欢歌·AI',
         description: 'AI合成的徵调旋律，热烈激昂，养心安神。',
-        src: '/music/bainiao.mp3',
+        src: '/music/xixiangfeng.mp3', // 使用喜相逢模拟
         duration: '4:30'
     },
     yu: {
@@ -39,7 +39,7 @@ export const AI_MUSIC = {
         element: '水',
         title: '深水静流·AI',
         description: 'AI合成的羽调旋律，深沉悠远，补肾固精。',
-        src: '/music/erquan.mp3',
+        src: '/music/hangong.mp3', // 使用汉宫秋月模拟
         duration: '6:00'
     }
 }

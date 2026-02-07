@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, ChevronRight, ChevronLeft, Crown } from 'lucide-vue-next'
 import { QUESTIONS_FREE, OPTIONS } from '../data/questions-free.js'
-import { QUESTIONS_VIP } from '../data/questions-vip.js'
 
 const router = useRouter()
 
@@ -11,7 +10,7 @@ const router = useRouter()
 const isVip = ref(localStorage.getItem('wuyin_vip') === 'true')
 
 // 使用的问卷
-const questions = computed(() => isVip.value ? QUESTIONS_VIP : QUESTIONS_FREE)
+const questions = computed(() => QUESTIONS_FREE)
 
 // 当前题目索引
 const currentIndex = ref(0)
@@ -87,8 +86,8 @@ const allAnswered = computed(() => {
           </button>
           <div class="flex items-center gap-2">
             <Crown v-if="isVip" class="w-4 h-4 text-gold" />
-            <span class="font-serif font-bold text-ink">体质测评</span>
-            <span class="text-xs text-ink-light">({{ isVip ? '67题' : '27题' }})</span>
+            <span class="font-serif font-bold text-ink">问诊</span>
+            <span class="text-xs text-ink-light">(27题)</span>
           </div>
           <div class="w-9"></div>
         </div>
@@ -109,6 +108,12 @@ const allAnswered = computed(() => {
 
     <!-- 问题区域 -->
     <main class="flex-1 flex flex-col max-w-lg mx-auto w-full px-6 py-8">
+      <!-- 7天建议提示 -->
+      <div class="mb-6 p-3 bg-ink/5 rounded-lg flex items-center gap-2 text-xs text-ink-light justify-center">
+        <span>📅</span>
+        <span>建议每7天进行一次复测，以动态调整调理方案。</span>
+      </div>
+
       <div class="flex-1 flex flex-col justify-center animate-fade-in-up" :key="currentIndex">
         <!-- 问题文本 -->
         <div class="text-center mb-10">
@@ -181,6 +186,11 @@ const allAnswered = computed(() => {
           <ChevronRight class="w-5 h-5" />
         </button>
       </div>
+      
+      <!-- 权威背书 -->
+      <p class="text-[10px] text-center text-ink-light/50 font-serif mt-8 pb-4">
+        依据国家标准 GB/T 46939-2025《中医体质分类与判定》制定
+      </p>
     </main>
   </div>
 </template>

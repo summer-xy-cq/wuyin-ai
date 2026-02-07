@@ -1,10 +1,33 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import MainLayout from '../layout/MainLayout.vue'
 
 const routes = [
     {
         path: '/',
-        name: 'Home',
-        component: () => import('../views/Home.vue')
+        component: MainLayout,
+        redirect: '/home',
+        children: [
+            {
+                path: 'home',
+                name: 'Home',
+                component: () => import('../views/Home.vue')
+            },
+            {
+                path: 'diagnosis',
+                name: 'Diagnosis',
+                component: () => import('../views/Diagnosis.vue')
+            },
+            {
+                path: 'result-tab',
+                name: 'ResultTab',
+                component: () => import('../views/Result.vue')
+            },
+            {
+                path: 'profile',
+                name: 'Profile',
+                component: () => import('../views/Profile.vue')
+            }
+        ]
     },
     {
         path: '/theory',
@@ -17,14 +40,9 @@ const routes = [
         component: () => import('../views/Assessment.vue')
     },
     {
-        path: '/result',
-        name: 'Result',
+        path: '/result', // 保持旧路由以防外部链接或特定跳转，但通常应用内会用 Tab
+        name: 'Result', // 或许可以重定向到 Tab?
         component: () => import('../views/Result.vue')
-    },
-    {
-        path: '/music',
-        name: 'Music',
-        component: () => import('../views/MusicLibrary.vue')
     },
     {
         path: '/tongue',
