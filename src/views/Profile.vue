@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { History, Crown, Settings, ChevronRight, ChevronDown, ChevronUp, Trash2, LogOut, UserCircle, Lock, ClipboardCheck } from 'lucide-vue-next'
+import { History, Crown, Settings, ChevronRight, ChevronDown, ChevronUp, Trash2, LogOut, UserCircle, Lock, ClipboardCheck, Database } from 'lucide-vue-next'
 import ConstitutionTrendChart from '../components/ConstitutionTrendChart.vue'
 
 const router = useRouter()
@@ -71,16 +71,35 @@ const handleTitleClick = () => {
 }
 
 const exportData = () => {
-  const data = JSON.parse(localStorage.getItem('wuyin_feedback') || '[]')
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `wuyin_research_data_${new Date().toISOString().split('T')[0]}.json`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+    if (!confirm('确定要导出所有科研及测评数据吗？')) return
+
+    const exportObj = {
+        title: '五音疗AI-科研数据导出',
+        exportDate: new Date().toISOString(),
+        user: user.value,
+        vip: isVip.value,
+        research: JSON.parse(localStorage.getItem('wuyin_research') || 'null'),
+        history: JSON.parse(localStorage.getItem('wuyin_history') || '[]'),
+        feedback: JSON.parse(localStorage.getItem('wuyin_feedback') || '[]')
+    }
+
+    const fileName = `wuyin_research_data_${new Date().toISOString().split('T')[0]}.json`
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+}
+
+const handleLogout = () => {
+    if (confirm('退出登录将清除本地缓存的所有数据（相当于重置应用）。确定要退出吗？')) {
+        localStorage.clear()
+        location.reload()
+    }
 }
 
 // 格式化日期
@@ -179,6 +198,16 @@ const updateRating = (index, rating) => {
 
       <!-- 设置列表 -->
       <div class="bg-white rounded-xl shadow-sm border border-ink/5 overflow-hidden">
+        <div class="p-4 flex items-center justify-between border-b border-ink/5 hover:bg-ink/5 transition-colors cursor-pointer" @click="exportData">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+              <Database class="w-5 h-5" />
+            </div>
+            <span class="font-medium text-ink">导出科研数据</span>
+          </div>
+          <ChevronRight class="w-5 h-5 text-ink-light" />
+        </div>
+
         <div class="p-4 flex items-center justify-between border-b border-ink/5 hover:bg-ink/5 transition-colors cursor-pointer">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-jade/10 flex items-center justify-center text-jade"><Settings class="w-4 h-4" /></div>
@@ -187,12 +216,11 @@ const updateRating = (index, rating) => {
           <ChevronRight class="w-4 h-4 text-ink-light" />
         </div>
          <!-- 仅作UI展示 -->
-        <div class="p-4 flex items-center justify-between hover:bg-ink/5 transition-colors cursor-pointer">
+        <div class="p-4 flex items-center justify-between hover:bg-ink/5 transition-colors cursor-pointer text-cinnabar" @click="handleLogout">
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-cinnabar/10 flex items-center justify-center text-cinnabar"><LogOut class="w-4 h-4" /></div>
-            <span class="text-sm font-medium text-ink">退出登录</span>
+            <LogOut class="w-5 h-5" />
+            <span class="font-bold">退出登录</span>
           </div>
-          <ChevronRight class="w-4 h-4 text-ink-light" />
         </div>
       </div>
       
