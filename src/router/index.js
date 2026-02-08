@@ -34,6 +34,10 @@ const routes = [
         name: 'Theory',
         component: () => import('../views/Theory.vue')
     },
+    { path: '/diagnosis', component: () => import('../views/Diagnosis.vue') },
+    { path: '/result', component: () => import('../views/Result.vue') },
+    { path: '/profile', component: () => import('../views/Profile.vue') },
+    { path: '/diagnosis-ai', component: () => import('../views/DiagnosisAI.vue') },
     {
         path: '/assessment',
         name: 'Assessment',

@@ -18,7 +18,7 @@ const displayedHistory = computed(() => {
 const user = ref({
   name: '中医爱好者',
   avatar: '', // 既然没有实际图片，使用 UserCircle 图标
-  days: 12    // 坚持天数
+  days: 0    // 坚持天数 (Calculated)
 })
 
 // 删除确认弹窗
@@ -32,6 +32,15 @@ onMounted(() => {
   const historyData = localStorage.getItem('wuyin_history')
   if (historyData) {
     history.value = JSON.parse(historyData)
+    
+    // Calculate persisted days (unique dates in history)
+    const uniqueDates = new Set(history.value.map(item => {
+        const d = new Date(item.date)
+        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+    }))
+    user.value.days = uniqueDates.size || 1 // At least 1 day if they have history, or default 0/1
+    if (uniqueDates.size === 0 && history.value.length > 0) user.value.days = 1
+    if (history.value.length === 0) user.value.days = 0 
   }
 })
 

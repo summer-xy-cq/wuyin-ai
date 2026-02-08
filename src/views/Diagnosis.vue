@@ -2,17 +2,30 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { Activity, Eye, Camera, Lock, ChevronRight, Crown, FileText, X, CheckCircle2 } from 'lucide-vue-next'
+import { Activity, Eye, Camera, Lock, ChevronRight, Crown, FileText, X, CheckCircle2, ScanFace, Loader2 } from 'lucide-vue-next'
 import { CONSTITUTIONS } from '../data/constitutions.js'
 
 const router = useRouter()
 const isVip = ref(localStorage.getItem('wuyin_vip') === 'true')
+const showVipModal = ref(false)
+const isUpgrading = ref(false)
 
 const rotateVip = () => {
+  // Original dev toggle, keep for backward compatibility or header usage
   isVip.value = !isVip.value
   localStorage.setItem('wuyin_vip', isVip.value.toString())
-  // 简易刷新VIP状态，实际应用应使用Store
   location.reload()
+}
+
+const handleUpgrade = () => {
+  isUpgrading.value = true
+  // Mock payment processing
+  setTimeout(() => {
+    isVip.value = true
+    localStorage.setItem('wuyin_vip', 'true')
+    isUpgrading.value = false
+    showVipModal.value = false
+  }, 1500)
 }
 
 // Manual Input Logic
@@ -118,45 +131,29 @@ const submitManualInput = () => {
           <ChevronRight class="w-4 h-4 text-ink-light" />
         </button>
 
-        <!-- 舌诊 -->
+        <!-- AI 望诊 (合并入口) -->
+        <!-- AI 望诊 (合并入口) -->
         <button 
-          @click="isVip ? router.push('/tongue') : null"
-          class="card p-6 flex items-center gap-4 group text-left relative overflow-hidden"
-          :class="!isVip && 'opacity-80 grayscale-[0.5]'"
+          @click="isVip ? router.push('/diagnosis-ai') : (showVipModal = true)"
+          class="card p-6 flex items-center gap-4 group text-left relative overflow-hidden bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-100"
+          :class="!isVip && 'opacity-80 grayscale-[0.8]'"
         >
           <div v-if="!isVip" class="absolute top-4 right-4 z-10">
             <Lock class="w-4 h-4 text-gold" />
+          </div>
+
+          <div class="absolute top-0 right-0 p-2" v-if="isVip">
+             <span class="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-bl-lg font-bold">New</span>
           </div>
           
-          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-jade to-jade-light flex items-center justify-center shadow-lg" :class="isVip && 'group-hover:scale-105 transition-transform'">
-            <Eye class="w-8 h-8 text-white" />
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+            <ScanFace class="w-8 h-8 text-white" />
           </div>
           <div class="flex-1">
-            <h3 class="font-serif font-bold text-lg text-ink mb-1">AI 舌诊</h3>
-            <p class="text-sm text-ink-light">拍摄舌象，AI自动分析舌质舌苔，辅助辨证。</p>
+            <h3 class="font-serif font-bold text-lg text-indigo-900 mb-1">AI 智能望诊</h3>
+            <p class="text-sm text-indigo-800/70">拍摄面象与舌象，AI 融合分析体质特征。</p>
           </div>
-          <ChevronRight v-if="isVip" class="w-5 h-5 text-ink-light" />
-          <span v-else class="text-xs text-gold font-bold border border-gold/30 px-2 py-1 rounded bg-gold/5">VIP</span>
-        </button>
-
-        <!-- 面诊 -->
-        <button 
-          @click="isVip ? router.push('/face') : null"
-          class="card p-6 flex items-center gap-4 group text-left relative overflow-hidden"
-          :class="!isVip && 'opacity-80 grayscale-[0.5]'"
-        >
-          <div v-if="!isVip" class="absolute top-4 right-4 z-10">
-            <Lock class="w-4 h-4 text-gold" />
-          </div>
-
-          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold to-gold-light flex items-center justify-center shadow-lg" :class="isVip && 'group-hover:scale-105 transition-transform'">
-            <Camera class="w-8 h-8 text-white" />
-          </div>
-          <div class="flex-1">
-            <h3 class="font-serif font-bold text-lg text-ink mb-1">AI 面诊</h3>
-            <p class="text-sm text-ink-light">面部分析，通过气色光泽判断脏腑健康状态。</p>
-          </div>
-          <ChevronRight v-if="isVip" class="w-5 h-5 text-ink-light" />
+          <ChevronRight v-if="isVip" class="w-5 h-5 text-indigo-400" />
           <span v-else class="text-xs text-gold font-bold border border-gold/30 px-2 py-1 rounded bg-gold/5">VIP</span>
         </button>
       </div>
@@ -207,5 +204,36 @@ const submitManualInput = () => {
         </div>
       </div>
     </main>
+    <!-- VIP 升级弹窗 -->
+    <div v-if="showVipModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">
+      <div class="bg-paper rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
+        <button @click="showVipModal = false" class="absolute top-3 right-3 text-ink-light hover:text-ink">
+          <X class="w-5 h-5" />
+        </button>
+        
+        <div class="p-6 text-center">
+          <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-gold to-orange-400 rounded-full flex items-center justify-center shadow-lg">
+            <Crown class="w-8 h-8 text-white" />
+          </div>
+          <h3 class="text-xl font-serif font-bold text-ink mb-2">
+              解锁 AI 智能望诊
+          </h3>
+          <p class="text-ink-light text-sm mb-6 leading-relaxed">
+            升级 VIP 会员，即可使用最新 AI 视觉分析技术。<br>
+            精准识别面象与舌象特征，获取深度体质解读。
+          </p>
+          
+          <button 
+            @click="handleUpgrade" 
+            :disabled="isUpgrading"
+            class="w-full py-3 bg-gradient-to-r from-cinnabar to-cinnabar-dark text-white rounded-xl font-bold hover:shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2"
+          >
+            <Loader2 v-if="isUpgrading" class="w-5 h-5 animate-spin" />
+            <Crown v-else class="w-5 h-5" />
+            {{ isUpgrading ? '正在开通...' : '立即升级 VIP' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
