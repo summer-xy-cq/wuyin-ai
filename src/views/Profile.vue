@@ -24,6 +24,7 @@ const user = ref({
 // 删除确认弹窗
 const showDeleteModal = ref(false)
 const deleteTargetIndex = ref(null)
+const showExportModal = ref(false)
 const showClearHistoryModal = ref(false)
 
 onMounted(() => {
@@ -54,9 +55,7 @@ const toggleExpand = (index) => {
   }
 }
 
-const exportData = () => {
-    if (!confirm('确定要导出所有科研及测评数据吗？')) return
-
+const confirmExport = () => {
     const exportObj = {
         title: '五音疗AI-科研数据导出',
         exportDate: new Date().toISOString(),
@@ -77,6 +76,12 @@ const exportData = () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    
+    showExportModal.value = false
+}
+
+const exportData = () => {
+    showExportModal.value = true
 }
 
 const handleLogout = () => {
@@ -382,6 +387,25 @@ const updateRating = (index, rating) => {
         <div class="flex gap-3">
           <button @click="showDeleteModal = false" class="flex-1 py-3 border rounded-xl">取消</button>
           <button @click="confirmDelete" class="flex-1 py-3 bg-cinnabar text-white rounded-xl">删除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导出确认弹窗 -->
+    <div 
+      v-if="showExportModal" 
+      class="fixed inset-0 z-[60] flex items-center justify-center p-6"
+      @click.self="showExportModal = false"
+    >
+      <div class="absolute inset-0 bg-ink/60 backdrop-blur-sm"></div>
+      <div class="relative bg-paper rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in-up">
+        <h3 class="text-lg font-serif font-bold text-ink mb-2 text-center">导出科研数据</h3>
+        <p class="text-center text-ink-light mb-6 text-sm">
+          确认导出吗？<br>这将生成一个包含您所有测评与科研记录的 JSON 文件。请将此文件发送给研究人员。
+        </p>
+        <div class="flex gap-3">
+          <button @click="showExportModal = false" class="flex-1 py-3 border rounded-xl">取消</button>
+          <button @click="confirmExport" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg">确认导出</button>
         </div>
       </div>
     </div>
