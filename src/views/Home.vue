@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { Music, BookOpen, Sparkles, ChevronRight, Play, Pause, CheckCircle2, Clock, Monitor, Star, Crown, Lock, Repeat } from 'lucide-vue-next'
+import { Music, BookOpen, Sparkles, ChevronRight, Play, Pause, CheckCircle2, Clock, Monitor, Star, Crown, Lock, Repeat, ClipboardCheck } from 'lucide-vue-next'
 import { getAIMusicByConstitution } from '../data/ai-music.js'
 import { CONSTITUTIONS } from '../data/constitutions.js'
 
@@ -86,6 +86,74 @@ watch(isPlaying, (val) => {
 onUnmounted(() => {
   if (dailyTimer) clearInterval(dailyTimer)
   saveDailyUsage()
+})
+
+// === 科研打卡逻辑 ===
+const showResearchModal = ref(false)
+const researchRating = ref({ sleep: 5, anxiety: 5, mood: 5 })
+const researchNote = ref('')
+const researchSubmitted = ref(false)
+
+const checkResearchStatus = () => {
+    const data = JSON.parse(localStorage.getItem('wuyin_research') || '{}')
+    
+    // 1. 必须在 Active 状态
+    if (data.status !== 'active') return
+
+    // 2. 检查今日是否已打卡
+    const todayStr = new Date().toDateString()
+    const todayLog = (data.logs || []).find(log => new Date(log.timestamp).toDateString() === todayStr)
+    
+    if (todayLog) return // 已打卡
+
+    // 3. 检查听歌时长 (测试版 > 10秒, 正式版 > 15分钟)
+    // 这里的 dailyListenTime 单位是秒
+    if (dailyListenTime.value > 15 * 60) { 
+        showResearchModal.value = true
+    }
+}
+
+const submitResearchLog = () => {
+    const data = JSON.parse(localStorage.getItem('wuyin_research') || '{}')
+    
+    if (!data.logs) data.logs = []
+    
+    // 计算今天是第几天
+    const startDate = new Date(data.startDate)
+    const today = new Date()
+    const diffTime = Math.abs(today - startDate)
+    const dayIndex = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) 
+
+    const log = {
+        day: dayIndex,
+        timestamp: new Date().toISOString(),
+        listenDuration: dailyListenTime.value,
+        ...researchRating.value,
+        note: researchNote.value
+    }
+    
+    data.logs.push(log)
+    localStorage.setItem('wuyin_research', JSON.stringify(data))
+    
+    researchSubmitted.value = true
+    setTimeout(() => {
+        showResearchModal.value = false
+    }, 2000)
+}
+
+// 监听播放状态和时间，触发打卡
+watch(dailyListenTime, (val) => {
+    // 每 30 秒检查一次是否有资格打卡
+    if (val > 0 && val % 30 === 0) {
+        checkResearchStatus()
+    }
+})
+
+// 监听暂停（用户可能听完准备离开）
+watch(isPlaying, (val) => {
+    if (!val) { // Paused
+        checkResearchStatus()
+    }
 })
 
 // === 播放器逻辑 ===
@@ -692,6 +760,67 @@ onUnmounted(() => {
              <div class="flex gap-3">
                 <button @click="showRetestModal = false" class="flex-1 py-3 border rounded-xl text-ink-light">稍后再说</button>
                 <button @click="router.push('/assessment')" class="flex-1 py-3 bg-cinnabar text-white rounded-xl font-bold shadow-md shadow-cinnabar/20">立即复测</button>
+             </div>
+        </div>
+      </div>
+
+      <!-- 科研每日打卡弹窗 -->
+      <div v-if="showResearchModal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">
+        <div class="bg-paper rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
+             <button @click="showResearchModal = false" class="absolute top-3 right-3 text-ink-light hover:text-ink z-10">
+                <span class="text-xl leading-none">&times;</span>
+             </button>
+
+             <div class="p-6">
+                <div v-if="!researchSubmitted">
+                     <div class="flex items-center justify-center gap-2 mb-4 text-indigo-600">
+                        <ClipboardCheck class="w-6 h-6" />
+                        <span class="font-bold text-lg">每日科研打卡</span>
+                     </div>
+                     <p class="text-center text-sm text-ink-light mb-6">今日听音任务已完成，请简单记录感受</p>
+                     
+                     <div class="space-y-4 mb-6">
+                        <div>
+                            <div class="flex justify-between text-xs text-ink-light mb-1">
+                                <span>睡眠改善</span>
+                                <span class="font-bold text-indigo-600">{{ researchRating.sleep }}</span>
+                            </div>
+                            <input type="range" min="0" max="10" v-model.number="researchRating.sleep" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs text-ink-light mb-1">
+                                <span>焦虑缓解</span>
+                                <span class="font-bold text-indigo-600">{{ researchRating.anxiety }}</span>
+                            </div>
+                            <input type="range" min="0" max="10" v-model.number="researchRating.anxiety" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs text-ink-light mb-1">
+                                <span>心情愉悦</span>
+                                <span class="font-bold text-indigo-600">{{ researchRating.mood }}</span>
+                            </div>
+                            <input type="range" min="0" max="10" v-model.number="researchRating.mood" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <input 
+                            v-model="researchNote"
+                            placeholder="其他感受（选填）"
+                            class="w-full p-2 bg-ink/5 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                     </div>
+
+                    <button 
+                        @click="submitResearchLog" 
+                        class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
+                    >
+                        提交打卡
+                    </button>
+                </div>
+
+                <div v-else class="text-center py-8">
+                    <CheckCircle2 class="w-12 h-12 text-green-500 mx-auto mb-3" />
+                    <h3 class="font-bold text-ink text-lg">打卡成功</h3>
+                    <p class="text-sm text-ink-light">感谢您的参与，离VIP奖励更近一步！</p>
+                </div>
              </div>
         </div>
       </div>

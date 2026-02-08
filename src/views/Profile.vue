@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { History, Crown, Settings, ChevronRight, ChevronDown, ChevronUp, Trash2, LogOut, UserCircle, Lock } from 'lucide-vue-next'
+import { History, Crown, Settings, ChevronRight, ChevronDown, ChevronUp, Trash2, LogOut, UserCircle, Lock, ClipboardCheck } from 'lucide-vue-next'
 import ConstitutionTrendChart from '../components/ConstitutionTrendChart.vue'
 
 const router = useRouter()
@@ -154,6 +154,28 @@ const updateRating = (index, rating) => {
           <div class="text-sm text-ink-light">已坚持调理 {{ user.days }} 天</div>
         </div>
       </div>
+
+      <!-- 科研体验官入口 -->
+      <section 
+        @click="router.push('/research')"
+        class="card p-5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 cursor-pointer active:scale-95 transition-transform group"
+      >
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform">
+            <ClipboardCheck class="w-6 h-6 text-white" />
+            </div>
+            <div class="flex-1">
+            <h3 class="font-bold text-ink flex items-center gap-2">
+                成为科研体验官
+                <span class="text-[10px] bg-red-500 text-white px-1.5 rounded-full animate-pulse">招募中</span>
+            </h3>
+            <p class="text-xs text-ink-light mt-0.5">完成7天体验，获赠 VIP 会员及荣誉证书</p>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-white/50 flex items-center justify-center group-hover:bg-white transition-colors">
+                <ChevronRight class="w-5 h-5 text-indigo-400" />
+            </div>
+        </div>
+      </section>
 
       <!-- 设置列表 -->
       <div class="bg-white rounded-xl shadow-sm border border-ink/5 overflow-hidden">
