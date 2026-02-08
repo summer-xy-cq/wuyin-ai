@@ -24,7 +24,6 @@ const user = ref({
 // 删除确认弹窗
 const showDeleteModal = ref(false)
 const deleteTargetIndex = ref(null)
-const showDebugModal = ref(false)
 const showClearHistoryModal = ref(false)
 
 onMounted(() => {
@@ -44,10 +43,6 @@ onMounted(() => {
   }
 })
 
-// 科研模式
-const researchClickCount = ref(0)
-const showExport = ref(false)
-
 // 展开状态
 const expandedIndex = ref(null)
 
@@ -56,17 +51,6 @@ const toggleExpand = (index) => {
     expandedIndex.value = null
   } else {
     expandedIndex.value = index
-  }
-}
-
-const handleTitleClick = () => {
-  researchClickCount.value++
-  if (researchClickCount.value === 5) {
-    showExport.value = !showExport.value // Toggle
-    if (showExport.value) {
-        showDebugModal.value = true
-    }
-    researchClickCount.value = 0 // Reset count
   }
 }
 
@@ -263,15 +247,9 @@ const updateRating = (index, rating) => {
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
             <History class="w-5 h-5 text-jade" />
-            <h2 @click="handleTitleClick" class="font-serif font-bold text-lg text-ink select-none cursor-pointer active:scale-95 transition-transform">测评记录</h2>
+            <h2 class="font-serif font-bold text-lg text-ink select-none">测评记录</h2>
           </div>
-          <button 
-            v-if="showExport" 
-            @click="exportData"
-            class="text-xs bg-ink/5 hover:bg-ink/10 text-ink px-2 py-1 rounded transition-colors"
-          >
-            导出数据
-          </button>
+
           
           <button 
              @click="showClearHistoryModal = true"
@@ -433,22 +411,6 @@ const updateRating = (index, rating) => {
       </div>
     </div>
 
-    <!-- 科研模式提示弹窗 -->
-    <div 
-      v-if="showDebugModal" 
-      class="fixed inset-0 z-[60] flex items-center justify-center p-6"
-    >
-      <div class="absolute inset-0 bg-ink/60 backdrop-blur-sm"></div>
-      <div class="relative bg-paper rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in-up">
-        <h3 class="text-lg font-serif font-bold text-ink mb-2 text-center">科研模式已开启</h3>
-        <p class="text-center text-ink-light mb-6 text-sm leading-relaxed">
-          您已成功开启数据导出功能。点击“我知道了”，代表您同意授权导出个人测评数据用于研究分析。您的隐私权将得到合法保护。
-        </p>
-        <div class="flex gap-3">
-            <button @click="showDebugModal = false" class="flex-1 py-3 border rounded-xl font-bold">取消</button>
-            <button @click="showDebugModal = false" class="flex-1 py-3 bg-jade text-white rounded-xl font-bold">我知道了</button>
-        </div>
-      </div>
-    </div>
+
   </div>
 </template>
