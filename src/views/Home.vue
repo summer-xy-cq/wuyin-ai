@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Music, BookOpen, Sparkles, ChevronRight, Play, Pause, CheckCircle2, Clock, Monitor, Star, Crown, Lock, Repeat, ClipboardCheck, Calendar } from 'lucide-vue-next'
 import { getAIMusicByConstitution } from '../data/ai-music.js'
 import { CONSTITUTIONS } from '../data/constitutions.js'
+import { storage } from '../utils/storage.js'
 
 const router = useRouter()
 const currentConstitution = ref(null)
@@ -12,12 +13,7 @@ const audioPlayer = ref(null)
 const musicType = ref('traditional')
 
 const loadData = () => {
-    const saved = localStorage.getItem('wuyin_current_constitution')
-    if (saved) {
-        currentConstitution.value = JSON.parse(saved)
-    } else {
-        currentConstitution.value = null
-    }
+    currentConstitution.value = storage.get('CONSTITUTION')
 }
 
 // 初始化
@@ -50,7 +46,7 @@ const dailyProgressPercent = computed(() => Math.min(100, (dailyListenTime.value
 const initDailyUsage = () => {
   try {
     const todayStr = new Date().toDateString()
-    const saved = JSON.parse(localStorage.getItem('wuyin_daily_usage') || '{}')
+    const saved = storage.get('DAILY_USAGE') || {}
     if (saved.date === todayStr) {
       dailyListenTime.value = saved.seconds || 0
     } else {
@@ -64,10 +60,10 @@ const initDailyUsage = () => {
 
 const saveDailyUsage = () => {
   const todayStr = new Date().toDateString()
-  localStorage.setItem('wuyin_daily_usage', JSON.stringify({
+  storage.set('DAILY_USAGE', {
     date: todayStr,
     seconds: dailyListenTime.value
-  }))
+  })
 }
 
 let dailyTimer = null
@@ -95,7 +91,7 @@ const researchNote = ref('')
 const researchSubmitted = ref(false)
 
 const checkResearchStatus = () => {
-    const data = JSON.parse(localStorage.getItem('wuyin_research') || '{}')
+    const data = storage.get('RESEARCH') || {}
     
     // 1. 必须在 Active 状态
     if (data.status !== 'active') return
@@ -114,15 +110,15 @@ const checkResearchStatus = () => {
 }
 
 const submitResearchLog = () => {
-    const data = JSON.parse(localStorage.getItem('wuyin_research') || '{}')
-    
+    const data = storage.get('RESEARCH') || {}
+
     if (!data.logs) data.logs = []
-    
+
     // 计算今天是第几天
     const startDate = new Date(data.startDate)
     const today = new Date()
     const diffTime = Math.abs(today - startDate)
-    const dayIndex = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) 
+    const dayIndex = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
     const log = {
         day: dayIndex,
@@ -131,9 +127,9 @@ const submitResearchLog = () => {
         ...researchRating.value,
         note: researchNote.value
     }
-    
+
     data.logs.push(log)
-    localStorage.setItem('wuyin_research', JSON.stringify(data))
+    storage.set('RESEARCH', data)
     
     researchSubmitted.value = true
     setTimeout(() => {
@@ -349,7 +345,7 @@ const handleAiTabClick = () => {
 
 const toggleVipStatus = () => {
     isVip.value = !isVip.value
-    localStorage.setItem('wuyin_vip', isVip.value)
+    storage.set('VIP', isVip.value)
     // Restart logic if needed or just let reactivity handle it?
     // If playing rhythm track and VIP lost, pause? 
     if (!isVip.value && playingRhythm.value && currentTime.value > 60) {
