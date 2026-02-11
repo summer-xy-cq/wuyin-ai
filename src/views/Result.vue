@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Play, Pause, RefreshCw, Music, Home, Loader2, Star, Sparkles, Lock, Crown, Repeat } from 'lucide-vue-next'
+import { ArrowLeft, Play, Pause, RefreshCw, Music, Home, Loader2, Star, Sparkles, Lock, Crown, Repeat, SkipForward } from 'lucide-vue-next'
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -42,7 +42,9 @@ const musicType = ref('traditional') // 'traditional' 或 'ai'
 const currentTime = ref(0)
 const duration = ref(0)
 const showVipModal = ref(false)
-const isLooping = ref(true)
+
+const isLooping = ref(false)
+const currentTrackIndex = ref(0)
 
 // VIP 状态
 const isVip = ref(localStorage.getItem('wuyin_vip') === 'true')
@@ -121,7 +123,28 @@ const currentMusic = computed(() => {
   if (musicType.value === 'ai') {
     return getAIMusicByConstitution(result.value.primary.key)
   } else {
-    const track = result.value.primary.constitution.tracks[0]
+    // 确保 index 有效
+    const tracks = result.value.primary.constitution.tracks || []
+    
+    // 如果没有 tracks 但有 key，尝试从 CONSTITUTIONS 获取（兼容旧数据）
+    let availableTracks = tracks
+    if (availableTracks.length === 0 && result.value.primary.key) {
+        const key = result.value.primary.key
+        if (CONSTITUTIONS[key]) {
+            availableTracks = CONSTITUTIONS[key].tracks || []
+        }
+    }
+
+    if (availableTracks.length > 0) {
+         if (currentTrackIndex.value >= availableTracks.length) currentTrackIndex.value = 0
+         return {
+            ...availableTracks[currentTrackIndex.value],
+            description: result.value.primary.constitution.musicDesc,
+            tone: result.value.primary.constitution.toneName
+         }
+    }
+    
+    const track = tracks[currentTrackIndex.value]
     return {
       title: track?.title,
       src: track?.src,
@@ -138,7 +161,52 @@ watch(musicType, () => {
     isPlaying.value = false
     currentTime.value = 0
   }
+  currentTrackIndex.value = 0 // Reset index when switching types
 })
+
+const selectTrack = (index) => {
+    if (currentTrackIndex.value === index) return
+    currentTrackIndex.value = index
+    
+    if(audioPlayer.value) {
+        audioPlayer.value.pause()
+        isPlaying.value = false
+    }
+    currentTime.value = 0
+    
+    setTimeout(() => {
+        if(audioPlayer.value) {
+            audioPlayer.value.play().catch(e => console.error('Playback failed', e))
+            isPlaying.value = true
+        }
+    }, 100)
+}
+
+const switchTrack = () => {
+    if (musicType.value === 'ai') return // AI music usually single stream per type
+    
+    const tracks = result.value.primary.constitution.tracks || []
+    if (tracks.length <= 1) return
+
+    // Pause current
+    if (audioPlayer.value) {
+        audioPlayer.value.pause()
+        isPlaying.value = false
+    }
+
+    // Switch index
+    currentTrackIndex.value = (currentTrackIndex.value + 1) % tracks.length
+    
+    // Reset progress
+    currentTime.value = 0
+    // Auto play new track after short delay
+    setTimeout(() => {
+        if(audioPlayer.value) {
+            audioPlayer.value.play().catch(e => console.error('Playback failed', e))
+            isPlaying.value = true
+        }
+    }, 300)
+}
 
 const handleAiMusicClick = () => {
     if (isVip.value) {
@@ -264,7 +332,7 @@ const calculateResult = () => {
     constitutionKey: result.value.primary.key,
     constitutionName: result.value.primary.constitution.name,
     toneName: result.value.primary.constitution.toneName,
-    traditionalMusic: result.value.primary.constitution.tracks[0],
+
     aiMusic: getAIMusicByConstitution(result.value.primary.key),
     version: version
   }
@@ -295,6 +363,8 @@ const togglePlay = () => {
 // 播放结束
 const onAudioEnded = () => {
   isPlaying.value = false
+  rating.value = 0
+  feedbackSubmitted.value = false
   showFeedback.value = true
 }
 
@@ -384,9 +454,7 @@ const submitFeedback = () => {
   localStorage.setItem('wuyin_feedback', JSON.stringify(feedbacks))
   
   feedbackSubmitted.value = true
-  setTimeout(() => {
-    showFeedback.value = false
-  }, 2000)
+  showFeedback.value = false
 }
 // End of script
 </script>
@@ -583,6 +651,16 @@ const submitFeedback = () => {
                     <Repeat class="w-4 h-4" />
                 </button>
 
+                 <!-- Switch Track Button -->
+                <button 
+                    v-if="musicType === 'traditional' && result.primary.constitution.tracks.length > 1"
+                    @click.stop="switchTrack"
+                    class="absolute top-4 left-12 z-20 p-1.5 rounded-full text-white/40 hover:text-white/80 transition-colors"
+                    title="切换曲目"
+                >
+                    <SkipForward class="w-4 h-4" />
+                </button>
+
                 <button 
                   @click="togglePlay"
                   class="relative w-14 h-14 rounded-full bg-gradient-to-br from-paper to-paper/90 text-ink flex items-center justify-center hover:scale-105 transition-transform shadow-lg"
@@ -645,37 +723,35 @@ const submitFeedback = () => {
               preload="auto"
             ></audio>
 
-            <!-- 五星评价 -->
-            <div v-if="showFeedback" class="mt-4 p-4 bg-ink/5 rounded-xl animate-fade-in-up">
-              <div v-if="!feedbackSubmitted">
-                <p class="text-sm text-ink mb-3 text-center">这首曲子对您的调理效果如何？</p>
-                <div class="flex justify-center gap-2 mb-3">
-                  <button 
-                    v-for="i in 5" 
-                    :key="i"
-                    @click="rating = i"
-                    class="text-2xl transition-transform hover:scale-110"
-                  >
-                    <Star 
-                      class="w-8 h-8 transition-colors" 
-                      :class="i <= rating ? 'text-gold fill-gold' : 'text-ink/20'"
-                    />
-                  </button>
+            <!-- Song Selection List (Traditional Only) -->
+            <div v-if="musicType === 'traditional' && result" class="mt-4 space-y-2">
+                <div class="px-1 text-xs font-bold text-ink-light mb-2">推荐曲目清单</div>
+                <div class="space-y-2">
+                     <div class="grid grid-cols-1 gap-2">
+                         <button 
+                            v-for="(track, idx) in (result?.primary?.constitution?.tracks || CONSTITUTIONS[result?.primary?.key]?.tracks || [])" 
+                            :key="idx"
+                            @click="selectTrack(idx)"
+                            class="flex items-center justify-between p-3 rounded-lg border transition-all text-left group"
+                            :class="currentTrackIndex === idx 
+                                ? 'bg-cinnabar/5 border-cinnabar/30 shadow-sm' 
+                                : 'bg-white border-transparent hover:border-ink/10'"
+                         >
+                            <div class="flex items-center gap-3">
+                                <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
+                                    :class="currentTrackIndex === idx ? 'bg-cinnabar text-white' : 'bg-ink/5 text-ink-light group-hover:bg-ink/10'"
+                                >
+                                    <div v-if="isPlaying && currentTrackIndex === idx" class="w-2 h-2 bg-white rounded-full animate-ping"></div>
+                                    <span v-else>{{ idx + 1 }}</span>
+                                </div>
+                                <span class="text-sm font-medium" :class="currentTrackIndex === idx ? 'text-cinnabar' : 'text-ink'">{{ track.title }}</span>
+                            </div>
+                            <div class="text-xs text-jade/80 font-bold bg-jade/5 px-2 py-0.5 rounded" v-if="idx === 0">推荐</div>
+                         </button>
+                     </div>
                 </div>
-                <button 
-                  @click="submitFeedback"
-                  :disabled="rating === 0"
-                  class="w-full py-2 rounded-lg text-sm font-medium transition-all"
-                  :class="rating > 0 ? 'bg-cinnabar text-white hover:bg-cinnabar-dark' : 'bg-ink/10 text-ink-light cursor-not-allowed'"
-                >
-                  提交评价
-                </button>
-              </div>
-              <div v-else class="text-center py-2">
-                <p class="text-jade font-medium">✓ 感谢您的反馈！</p>
-                <p class="text-xs text-ink-light mt-1">您的评价将帮助我们优化推荐</p>
-              </div>
             </div>
+
           </div>
         </section>
 
@@ -732,7 +808,6 @@ const submitFeedback = () => {
     <!-- 反馈弹窗 -->
     <div v-if="showFeedback" class="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm p-6">
       <div class="card p-6 max-w-sm w-full animate-fade-in-up">
-        <div v-if="!feedbackSubmitted">
           <h3 class="font-serif font-bold text-lg text-ink text-center mb-4">疗效反馈</h3>
           
           <div class="flex justify-center gap-2 mb-4">
@@ -753,14 +828,6 @@ const submitFeedback = () => {
             <button @click="showFeedback = false" class="btn-secondary flex-1">跳过</button>
             <button @click="submitFeedback" :disabled="rating === 0" class="btn-primary flex-1" :class="rating === 0 && 'opacity-50'">提交</button>
           </div>
-        </div>
-        
-        <div v-else class="text-center py-4">
-          <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-jade/10 flex items-center justify-center">
-            <Star class="w-6 h-6 text-jade" />
-          </div>
-          <p class="font-serif font-bold text-ink">感谢您的反馈！</p>
-        </div>
       </div>
     </div>
     <!-- VIP 升级弹窗 -->

@@ -203,6 +203,11 @@ const submitManualInput = () => {
             </div>
         </div>
       </div>
+      <!-- 7天建议提示 -->
+      <div class="mt-6 p-3 bg-ink/5 rounded-lg flex items-center gap-2 text-xs text-ink-light justify-center">
+        <span>📅</span>
+        <span>建议每7天进行一次复测，以动态调整调理方案。</span>
+      </div>
     </main>
     <!-- VIP 升级弹窗 -->
     <div v-if="showVipModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">

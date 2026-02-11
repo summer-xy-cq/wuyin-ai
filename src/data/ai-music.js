@@ -7,7 +7,7 @@ export const AI_MUSIC = {
         element: '土',
         title: '大地之韵·AI',
         description: 'AI合成的宫调旋律，厚重稳健，健脾和胃。',
-        src: '/music/guzheng_generic.mp3', // 独特
+        src: '/music/guzheng_generic.mp3', // AI合成宫调
         duration: '5:30'
     },
     shang: {

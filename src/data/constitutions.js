@@ -11,7 +11,7 @@ export const CONSTITUTIONS = {
         toneElement: '土',
         musicDesc: '宫音悠扬和谐，中正平和，如大地般宽厚，调和五脏。',
         tracks: [
-            { title: '春江花月夜', src: '/music/chunjiang.mp3' },
+            { title: '春江花月夜 (古筝)', src: '/music/chunjiang.mp3' },
             { title: '高山流水', src: '/music/gaoshan.mp3' }
         ],
         advice: {
@@ -32,8 +32,8 @@ export const CONSTITUTIONS = {
         toneElement: '土',
         musicDesc: '宫音入脾，脾为气血生化之源。听宫音可健脾益气，改善疲乏。',
         tracks: [
-            { title: '平湖秋月', src: '/music/pinghu.mp3' },
-            { title: '春江花月夜', src: '/music/chunjiang.mp3' }
+            { title: '秋湖月夜', src: '/music/qiuhu.mp3' },
+            { title: '紫竹调', src: '/music/zizhu.mp3' }
         ],
         advice: {
             diet: '多吃益气健脾的食物，如黄豆、白扁豆、鸡肉、大枣。少吃空心菜、生萝卜等耗气食物。',
@@ -53,8 +53,8 @@ export const CONSTITUTIONS = {
         toneElement: '火',
         musicDesc: '徵音入心，属火。听徵音可振奋阳气，温暖身心，热烈激昂。',
         tracks: [
-            { title: '百鸟朝凤', src: '/music/bainiao.mp3' },
-            { title: '喜相逢', src: '/music/xixiangfeng.mp3' }
+            { title: '燕归来', src: '/music/yanguilai.mp3' },
+            { title: '百鸟朝凤', src: '/music/bainiao.mp3' }
         ],
         advice: {
             diet: '多吃甘温益气的食物，如羊肉、韭菜、生姜、桂圆。少吃生冷寒凉食物。',
@@ -74,8 +74,8 @@ export const CONSTITUTIONS = {
         toneElement: '水',
         musicDesc: '羽音入肾，属水。听羽音可滋阴润燥，清热安神，深沉悠远。',
         tracks: [
-            { title: '二泉映月', src: '/music/erquan.mp3' },
-            { title: '汉宫秋月', src: '/music/hangong.mp3' }
+            { title: '云水禅心', src: '/music/yunshui.mp3' },
+            { title: '二泉映月', src: '/music/erquan.mp3' }
         ],
         advice: {
             diet: '多吃甘凉滋润的食物，如鸭肉、百合、银耳、黑芝麻。少吃温热燥烈之品。',
@@ -95,8 +95,8 @@ export const CONSTITUTIONS = {
         toneElement: '土',
         musicDesc: '宫音健脾除湿，帮助身体运化水湿，厚重稳健。',
         tracks: [
-            { title: '高山流水', src: '/music/gaoshan.mp3' },
-            { title: '云水禅心', src: '/music/yunshui.mp3' }
+            { title: '小胡笳', src: '/music/xiaohujia.mp3' },
+            { title: '平湖秋月', src: '/music/pinghu.mp3' }
         ],
         advice: {
             diet: '饮食清淡，多吃健脾利湿的食物，如冬瓜、薏米、赤小豆。少吃甜食、肥肉。',
@@ -116,8 +116,8 @@ export const CONSTITUTIONS = {
         toneElement: '木',
         musicDesc: '角音入肝，疏泄郁热，舒展生发，配合清热利湿。',
         tracks: [
-            { title: '阳关三叠', src: '/music/yangguan.mp3' },
-            { title: '广陵散', src: '/music/guangling.mp3' }
+            { title: '阳春白雪', src: '/music/yangchun.mp3' },
+            { title: '阳关三叠', src: '/music/yangguan.mp3' }
         ],
         advice: {
             diet: '饮食清淡，多吃甘寒食物，如绿豆、空心菜、芹菜。禁酒，少吃辛辣滋腻食物。',
@@ -137,7 +137,7 @@ export const CONSTITUTIONS = {
         toneElement: '木',
         musicDesc: '角音入肝，主疏泄。听角音可帮助行气活血，化瘀通络。',
         tracks: [
-            { title: '广陵散', src: '/music/guangling.mp3' },
+            { title: '十面埋伏', src: '/music/shimian.mp3' },
             { title: '胡笳十八拍', src: '/music/hujia.mp3' }
         ],
         advice: {
@@ -158,8 +158,8 @@ export const CONSTITUTIONS = {
         toneElement: '木',
         musicDesc: '角音入肝，调达气机。听角音可疏肝解郁，开阔心胸，舒展生发。',
         tracks: [
-            { title: '胡笳十八拍', src: '/music/hujia.mp3' },
-            { title: '阳关三叠', src: '/music/yangguan.mp3' }
+            { title: '梅花三弄', src: '/music/meihua.mp3' },
+            { title: '广陵散', src: '/music/guangling.mp3' }
         ],
         advice: {
             diet: '多吃行气解郁的食物，如佛手、橙子、玫瑰花。少吃收敛酸涩之物。',
@@ -177,10 +177,10 @@ export const CONSTITUTIONS = {
         tone: 'gong',
         toneName: '宫',
         toneElement: '土',
-        musicDesc: '特禀体质需固本培元，宫音作为五音之首，可调和气血，增强体质。',
+        musicDesc: '特禀体质需固本培元，平心静气。听《云水禅心》可安神静心，缓解过敏不适。',
         tracks: [
             { title: '云水禅心', src: '/music/yunshui.mp3' },
-            { title: '平湖秋月', src: '/music/pinghu.mp3' }
+            { title: '高山流水', src: '/music/gaoshan.mp3' }
         ],
         advice: {
             diet: '饮食清淡粗细搭配，少吃荞麦、蚕豆等发物。根据过敏源避免特定食物。',

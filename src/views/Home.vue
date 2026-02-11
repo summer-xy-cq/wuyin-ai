@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted, onActivated } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted, onActivated, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Music, BookOpen, Sparkles, ChevronRight, Play, Pause, CheckCircle2, Clock, Monitor, Star, Crown, Lock, Repeat, ClipboardCheck } from 'lucide-vue-next'
+import { Music, BookOpen, Sparkles, ChevronRight, Play, Pause, CheckCircle2, Clock, Monitor, Star, Crown, Lock, Repeat, ClipboardCheck, Calendar } from 'lucide-vue-next'
 import { getAIMusicByConstitution } from '../data/ai-music.js'
 import { CONSTITUTIONS } from '../data/constitutions.js'
 
@@ -227,6 +227,8 @@ const getConstitutionKeyByTone = (tone) => {
 
 
 
+const currentTrackIndex = ref(0) // ADDED: Track selection index
+
 const currentMusic = computed(() => {
   // If playing a rhythm track, prioritize it
   if (playingRhythm.value && rhythmTrack.value && rhythmTrack.value.src) {
@@ -243,20 +245,58 @@ const currentMusic = computed(() => {
     }
     return { title: 'AI生成旋律', src: '', duration: '0:00' }
   } else {
+    // UPDATED: Support multiple tracks selection
+    // Ensure we have tracks array
+    let tracks = c.tracks || []
+    
+    // If tracks missing in history but we have key, try to fetch from CONSTITUTIONS (fallback for old data)
+    if (tracks.length === 0 && (c.constitutionKey || c.key)) {
+        const key = c.constitutionKey || c.key
+        if (CONSTITUTIONS[key]) {
+            tracks = CONSTITUTIONS[key].tracks || []
+        }
+    }
+
+    if (tracks.length > 0) {
+        // Validation of index
+        if (currentTrackIndex.value >= tracks.length) currentTrackIndex.value = 0
+        return tracks[currentTrackIndex.value]
+    }
+    
+    // Fallback if no tracks
     if (c.traditionalMusic && c.traditionalMusic.src && c.traditionalMusic.title) return c.traditionalMusic
-    if (c.tracks && Array.isArray(c.tracks) && c.tracks.length > 0) return c.tracks[0]
     return { title: '传统古曲', src: '', duration: '0:00' }
   }
 })
 
-// 切换Tab停止播放
+// Switch track function
+const selectTrack = (index) => {
+    if (currentTrackIndex.value === index) return
+    currentTrackIndex.value = index
+    // If playing, pause and restart? or just auto play new track?
+    // Let's stop first to be safe
+    if(audioPlayer.value) {
+        audioPlayer.value.pause()
+        isPlaying.value = false
+    }
+    currentTime.value = 0
+    
+    setTimeout(() => {
+        if(audioPlayer.value) {
+            audioPlayer.value.play().catch(e => console.error(e))
+            isPlaying.value = true
+        }
+    }, 100)
+}
+
+// Reset index when switching types
 watch(musicType, () => {
   if (audioPlayer.value) {
     audioPlayer.value.pause()
     isPlaying.value = false
     currentTime.value = 0
   }
-
+  currentTrackIndex.value = 0 
 })
 
 // === VIP & 试听逻辑 ===
@@ -318,46 +358,52 @@ const toggleVipStatus = () => {
 }
 
 const playRhythmTrack = () => {
+    // 如果正在播放时辰音乐，再次点击为暂停/恢复
+    if (playingRhythm.value && isPlaying.value) {
+        audioPlayer.value.pause()
+        isPlaying.value = false
+        return
+    }
+    if (playingRhythm.value && !isPlaying.value && rhythmTrack.value?.src) {
+        audioPlayer.value.play().catch(e => console.error('Playback failed', e))
+        isPlaying.value = true
+        return
+    }
+
     // 停止其他播放
-    if (isPlaying.value && !playingRhythm.value) {
+    if (isPlaying.value) {
         if (audioPlayer.value) audioPlayer.value.pause()
         isPlaying.value = false
     }
 
-    // 设置当前播放为养生音乐
-    const toneMap = {
-        '宫': 'peace', // 平和质 (Example) - Tuning needed
-        '商': 'qi_deficiency', // Using proxies
-        '角': 'qi_stagnation',
-        '徵': 'yin_deficiency',
-        '羽': 'yang_deficiency'
-    }
-    // Simple mapping: Use a track from a constitution with matching tone
-    // Ideally we have a track library. For now, we map to constitution tracks.
-    // Gong (Earth) -> Phlegm-Dampness? No, Balanced is Gong.
+    // Use the pre-computed TRACK_MAP to find the source for the current rhythm music
+    const trackInfo = TRACK_MAP[currentRhythm.value.music];
     
-    // Let's use the `currentRhythm.tone` to find a track.
-    // Mocking real tracks with constitution tracks for this demo
-    const targetKey = Object.keys(CONSTITUTIONS).find(k => CONSTITUTIONS[k].tone === currentRhythm.value.tone) || 'peace'
-    const track = {
-        title: currentRhythm.value.music,
-        src: `/music/${targetKey}.mp3`, // Assumption: Files exist. Or uses constitution logic.
-        // Actually, let's use the exact logic from Assessment or Result if possible.
-        // But for now, let's assume we change `currentMusic` to return this track.
-        isRhythm: true
-    }
-    
-    // Since I don't have the file system structure for music here, I'll rely on the existing constitution structure.
-    // I will set `rhythmTrack.value`
-    const toneTarget = CONSTITUTIONS[targetKey]
-    rhythmTrack.value = {
-        title: currentRhythm.value.music,
-        src: toneTarget && toneTarget.traditionalMusic ? toneTarget.traditionalMusic.src : '',
-        duration: '0:00'
+    if (trackInfo && trackInfo.src) {
+        rhythmTrack.value = {
+            title: currentRhythm.value.music,
+            src: trackInfo.src,
+            duration: trackInfo.duration,
+            isRhythm: true
+        }
+    } else {
+        console.warn('No track found for:', currentRhythm.value.music);
+        return;
     }
 
     playingRhythm.value = true
-    togglePlay()
+    
+    // 等待 Vue 更新 DOM（audio src 绑定更新），然后加载并播放
+    nextTick(() => {
+        if (!audioPlayer.value) return
+        audioPlayer.value.load()
+        const onCanPlay = () => {
+            audioPlayer.value.removeEventListener('canplay', onCanPlay)
+            audioPlayer.value.play().catch(e => console.error('Playback failed', e))
+            isPlaying.value = true
+        }
+        audioPlayer.value.addEventListener('canplay', onCanPlay)
+    })
 }
 
 // Override togglePlay to handle VIP check
@@ -403,23 +449,44 @@ const TCM_SCHEDULE = [
 ]
 
 // Define TRACK_MAP based on TCM_SCHEDULE and CONSTITUTIONS
+// Define TRACK_MAP based on TCM_SCHEDULE and CONSTITUTIONS
 const TRACK_MAP = {};
+
+// Helper to find track by title in CONSTITUTIONS
+const findTrackSrcByTitle = (title) => {
+    for (const key in CONSTITUTIONS) {
+        const c = CONSTITUTIONS[key];
+        const track = c.tracks.find(t => t.title === title);
+        if (track) return track;
+        // Check traditionalMusic prop too just in case
+        if (c.traditionalMusic && c.traditionalMusic.title === title) return c.traditionalMusic;
+    }
+    return null;
+}
+
 TCM_SCHEDULE.forEach(item => {
-  if (!TRACK_MAP[item.music]) { // Only map each unique music title once
-    const matchingConstitutionKey = getConstitutionKeyByTone(item.tone);
-    if (matchingConstitutionKey && CONSTITUTIONS[matchingConstitutionKey].traditionalMusic) {
+  if (!TRACK_MAP[item.music]) { 
+    // 1. Try to find exact title match
+    let track = findTrackSrcByTitle(item.music);
+    
+    // 2. Fallback: Find by tone if specific title not found (though they should map 1:1 in this app's design)
+    if (!track) {
+        const matchingConstitutionKey = getConstitutionKeyByTone(item.tone);
+        if (matchingConstitutionKey && CONSTITUTIONS[matchingConstitutionKey].traditionalMusic) {
+             track = CONSTITUTIONS[matchingConstitutionKey].traditionalMusic;
+        }
+    }
+
+    if (track) {
       TRACK_MAP[item.music] = {
         title: item.music,
-        src: CONSTITUTIONS[matchingConstitutionKey].traditionalMusic.src,
-        duration: CONSTITUTIONS[matchingConstitutionKey].traditionalMusic.duration || '0:00'
+        src: track.src,
+        duration: track.duration || '0:00'
       };
     } else {
-      console.warn(`Could not find a suitable music source for TCM music: ${item.music} (Tone: ${item.tone})`);
-      TRACK_MAP[item.music] = {
-        title: item.music,
-        src: '', // Placeholder
-        duration: '0:00'
-      };
+      console.warn(`Could not find a suitable music source for TCM music: ${item.music}`);
+      // Fallback to empty
+      TRACK_MAP[item.music] = { title: item.music, src: '', duration: '0:00' };
     }
   }
 });
@@ -595,18 +662,51 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <audio 
-          ref="audioPlayer" 
-          :src="currentMusic?.src"
-          :loop="isLooping"
-          @ended="isPlaying = false"
-          @timeupdate="updateProgress"
-          @loadedmetadata="updateProgress"
-          preload="auto"
-        ></audio>
+
+        <!-- Song Selection List (Traditional Only) -->
+        <div v-if="musicType === 'traditional' && currentConstitution" class="mt-4 space-y-2">
+            <div class="px-1 text-xs font-bold text-ink-light mb-2">推荐曲目清单</div>
+            <div class="space-y-2">
+                 <!-- We need to access the tracks list properly in template -->
+                 <!-- Use computed for tracks list to be safe -->
+                 <div class="grid grid-cols-1 gap-2">
+                     <button 
+                        v-for="(track, idx) in (CONSTITUTIONS[currentConstitution.constitutionKey || currentConstitution.key]?.tracks || [])"
+                        :key="idx"
+                        @click="selectTrack(idx)"
+                        class="flex items-center justify-between p-3 rounded-lg border transition-all text-left group"
+                        :class="currentTrackIndex === idx 
+                            ? 'bg-cinnabar/5 border-cinnabar/30 shadow-sm' 
+                            : 'bg-white border-transparent hover:border-ink/10'"
+                     >
+                        <div class="flex items-center gap-3">
+                            <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
+                                :class="currentTrackIndex === idx ? 'bg-cinnabar text-white' : 'bg-ink/5 text-ink-light group-hover:bg-ink/10'"
+                            >
+                                <div v-if="isPlaying && currentTrackIndex === idx" class="w-2 h-2 bg-white rounded-full animate-ping"></div>
+                                <span v-else>{{ idx + 1 }}</span>
+                            </div>
+                            <span class="text-sm font-medium" :class="currentTrackIndex === idx ? 'text-cinnabar' : 'text-ink'">{{ track.title }}</span>
+                        </div>
+                        <div class="text-xs text-jade/80 font-bold bg-jade/5 px-2 py-0.5 rounded" v-if="idx === 0">推荐</div>
+                     </button>
+                 </div>
+            </div>
+        </div>
       </section>
 
-      <!-- 顺应天时 (替代每日修身) -->
+      <!-- 全局音频播放器（不依赖 currentConstitution） -->
+      <audio 
+        ref="audioPlayer" 
+        :src="currentMusic?.src"
+        :loop="isLooping"
+        @ended="isPlaying = false"
+        @timeupdate="updateProgress"
+        @loadedmetadata="updateProgress"
+        preload="auto"
+      ></audio>
+
+      <!-- 顺应天时 · 十二时辰养生音乐推荐 -->
       <section class="card p-0 overflow-hidden mb-6 animate-fade-in-up" style="animation-delay: 0.22s">
         <!-- 头部背景：根据时辰变化 -->
         <div class="relative h-24 bg-gradient-to-r p-5 flex flex-col justify-center"
@@ -618,6 +718,7 @@ onUnmounted(() => {
               <span>{{ currentRhythm.timeRange }} · {{ currentRhythm.period }}</span>
             </div>
             <h2 class="font-serif font-bold text-xl">{{ currentRhythm.action }}</h2>
+            <p class="text-xs text-white/70 mt-0.5">十二时辰养生音乐推荐</p>
           </div>
         </div>
 

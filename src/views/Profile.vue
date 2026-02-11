@@ -126,6 +126,7 @@ const confirmClearHistory = () => {
     localStorage.removeItem('wuyin_daily_usage')
     localStorage.removeItem('wuyin_feedback')
     localStorage.removeItem('wuyin_answers')
+    localStorage.removeItem('wuyin_research')
     showClearHistoryModal.value = false
 }
 

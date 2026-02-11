@@ -109,10 +109,7 @@ const allAnswered = computed(() => {
     <!-- 问题区域 -->
     <main class="flex-1 flex flex-col max-w-lg mx-auto w-full px-6 py-8">
       <!-- 7天建议提示 -->
-      <div class="mb-6 p-3 bg-ink/5 rounded-lg flex items-center gap-2 text-xs text-ink-light justify-center">
-        <span>📅</span>
-        <span>建议每7天进行一次复测，以动态调整调理方案。</span>
-      </div>
+
 
       <div class="flex-1 flex flex-col justify-center animate-fade-in-up" :key="currentIndex">
         <!-- 问题文本 -->
