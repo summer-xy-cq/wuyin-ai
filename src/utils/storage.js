@@ -10,7 +10,9 @@ export const STORAGE_KEYS = {
   VIP: 'wuyin_vip',
   RESEARCH: 'wuyin_research',
   DAILY_USAGE: 'wuyin_daily_usage',
-  FEEDBACK: 'wuyin_feedback'
+  FEEDBACK: 'wuyin_feedback',
+  ANSWERS: 'wuyin_answers',
+  ANSWERS_TEMP: 'wuyin_answers_temp'
 }
 
 /**

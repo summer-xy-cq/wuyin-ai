@@ -3,11 +3,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, ChevronRight, ChevronLeft, Crown } from 'lucide-vue-next'
 import { QUESTIONS_FREE, OPTIONS } from '../data/questions-free.js'
+import { storage } from '../utils/storage.js'
 
 const router = useRouter()
 
 // VIP状态
-const isVip = ref(localStorage.getItem('wuyin_vip') === 'true')
+const isVip = ref(storage.get('VIP') === true || localStorage.getItem('wuyin_vip') === 'true')
 
 // 使用的问卷
 const questions = computed(() => QUESTIONS_FREE)
@@ -27,13 +28,9 @@ const hasAnswered = computed(() => answers.value[currentQuestion.value?.id] !== 
 
 // 初始化时读取本地存储的答案
 onMounted(() => {
-  const saved = localStorage.getItem('wuyin_answers_temp')
+  const saved = storage.get('ANSWERS_TEMP')
   if (saved) {
-    try {
-      answers.value = JSON.parse(saved)
-    } catch (e) {
-      answers.value = {}
-    }
+    answers.value = saved
   }
 })
 
@@ -41,7 +38,7 @@ onMounted(() => {
 const selectAnswer = (value) => {
   answers.value[currentQuestion.value.id] = value
   // 保存临时答案
-  localStorage.setItem('wuyin_answers_temp', JSON.stringify(answers.value))
+  storage.set('ANSWERS_TEMP', answers.value)
 }
 
 // 下一题
@@ -61,10 +58,10 @@ const prevQuestion = () => {
 // 提交
 const submit = () => {
   // 保存最终答案
-  localStorage.setItem('wuyin_answers', JSON.stringify(answers.value))
+  storage.set('ANSWERS', answers.value)
   localStorage.setItem('wuyin_question_version', isVip.value ? 'vip' : 'free')
   // 清除临时答案
-  localStorage.removeItem('wuyin_answers_temp')
+  storage.remove('ANSWERS_TEMP')
   // 跳转到结果页
   router.push('/result')
 }
