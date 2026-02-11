@@ -330,6 +330,9 @@ const calculateResult = () => {
   // 统一使用国标卷
   result.value = getFullAssessment(answers, QUESTIONS_FREE)
   console.log('[Result] Calculated result:', result.value)
+  console.log('[Result] Primary constitution:', result.value.primary.key, 'score:', result.value.scores.transformed[result.value.primary.key])
+  console.log('[Result] All scores:', result.value.scores.transformed)
+  console.log('[Result] Tendencies:', result.value.tendencies)
 
   // 保存体质历史记录
   const historyRecord = {
@@ -525,8 +528,8 @@ const submitFeedback = () => {
         <!-- 雷达图 (VIP) -->
         <section class="card p-6 animate-fade-in-up" style="animation-delay: 0.1s">
           <h3 class="font-serif font-bold text-lg text-ink mb-4 text-center">体质全景分析</h3>
-          <div class="h-64 relative">
-            <Chart type="radar" :data="chartData" :options="chartOptions" :class="{ 'blur-sm opacity-50': !isVip }" />
+          <div class="h-80 w-full relative">
+            <Chart v-if="chartData.datasets && chartData.datasets.length > 0" type="radar" :data="chartData" :options="chartOptions" />
             
             <!-- VIP 锁 -->
             <div v-if="!isVip" class="absolute inset-0 flex flex-col items-center justify-center z-10">
