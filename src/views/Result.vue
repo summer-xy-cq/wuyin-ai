@@ -16,6 +16,7 @@ import { QUESTIONS_FREE } from '../data/questions-free.js'
 import { CONSTITUTIONS } from '../data/constitutions.js'
 import { getFullAssessment } from '../utils/scoring.js'
 import { getAIMusicByConstitution } from '../data/ai-music.js'
+import { storage } from '../utils/storage.js'
 
 const TONE_COLORS = {
   '宫': 'from-amber-500 via-orange-500 to-yellow-600', // Earth - Yellow
@@ -46,8 +47,8 @@ const showVipModal = ref(false)
 const isLooping = ref(false)
 const currentTrackIndex = ref(0)
 
-// VIP 状态
-const isVip = ref(localStorage.getItem('wuyin_vip') === 'true')
+// VIP 状态（演示模式自动解锁）
+const isVip = ref(location.search.includes('demo=1') || localStorage.getItem('wuyin_vip') === 'true')
 
 // 进度百分比
 const progress = computed(() => {
@@ -261,11 +262,11 @@ const chartData = computed(() => {
 const loadData = () => {
     loading.value = true
     // 模拟AI分析加载 (Only if we have data to analyze or existing result)
-    // Actually, check localStorage first.
-    const currentStr = localStorage.getItem('wuyin_current_constitution')
-    const answersStr = localStorage.getItem('wuyin_answers')
+    // Actually, check storage first.
+    const current = storage.get('CONSTITUTION')
+    const answers = storage.get('ANSWERS')
     
-    if (!currentStr && !answersStr) {
+    if (!current && !answers) {
         result.value = null
         loading.value = false
         return
@@ -293,9 +294,8 @@ onActivated(() => {
 // 计算结果
 const calculateResult = () => {
     // 1. Check for Manual Input first
-    const currentStr = localStorage.getItem('wuyin_current_constitution')
-    if (currentStr) {
-        const current = JSON.parse(currentStr)
+    const current = storage.get('CONSTITUTION')
+    if (current) {
         // If it's a recent manual input (less than 5 mins old? or just isManual flag), use it.
         // Actually, just checking isManual is enough for now, as we redirect immediately.
         if (current.isManual) {
@@ -313,14 +313,13 @@ const calculateResult = () => {
         }
     }
 
-  const answersStr = localStorage.getItem('wuyin_answers')
+  const answers = storage.get('ANSWERS')
   
-  if (!answersStr) {
+  if (!answers) {
     router.push('/assessment')
     return
   }
   
-  const answers = JSON.parse(answersStr)
   const version = 'GB/T 46939-2025' // 国标版本
   
   // 统一使用国标卷
@@ -338,14 +337,14 @@ const calculateResult = () => {
   }
   
   // 获取历史记录
-  const history = JSON.parse(localStorage.getItem('wuyin_history') || '[]')
+  const history = storage.get('HISTORY') || []
   history.unshift(historyRecord) // 添加到开头
   // 最多保存20条
   if (history.length > 20) history.pop()
-  localStorage.setItem('wuyin_history', JSON.stringify(history))
+  storage.set('HISTORY', history)
   
   // 保存当前体质（供首页使用）
-  localStorage.setItem('wuyin_current_constitution', JSON.stringify(historyRecord))
+  storage.set('CONSTITUTION', historyRecord)
 }
 
 // 播放控制
@@ -403,7 +402,7 @@ onUnmounted(() => {
   
   // 即使未提交评价，只要有播放数据也保存
   if (listenDuration.value > 0) {
-    const history = JSON.parse(localStorage.getItem('wuyin_history') || '[]')
+    const history = storage.get('HISTORY') || []
     if (history.length > 0) {
       if (!history[0].feedback) {
         history[0].feedback = {}
@@ -412,10 +411,10 @@ onUnmounted(() => {
       history[0].feedback.listenDuration = listenDuration.value
       history[0].feedback.musicType = musicType.value
       
-      localStorage.setItem('wuyin_history', JSON.stringify(history))
+      storage.set('HISTORY', history)
       
       // 同步更新当前体质
-      localStorage.setItem('wuyin_current_constitution', JSON.stringify(history[0]))
+      storage.set('CONSTITUTION', history[0])
     }
   }
 })
@@ -423,7 +422,7 @@ onUnmounted(() => {
 // 提交反馈
 const submitFeedback = () => {
   // 更新当前历史记录的反馈
-  const history = JSON.parse(localStorage.getItem('wuyin_history') || '[]')
+  const history = storage.get('HISTORY') || []
   if (history.length > 0) {
     // 找到最新的记录（刚刚创建的）
     history[0].feedback = {
@@ -433,10 +432,10 @@ const submitFeedback = () => {
       timestamp: new Date().toISOString(),
       listenDuration: listenDuration.value
     }
-    localStorage.setItem('wuyin_history', JSON.stringify(history))
+    storage.set('HISTORY', history)
     
     // 同步更新当前体质
-    localStorage.setItem('wuyin_current_constitution', JSON.stringify(history[0]))
+    storage.set('CONSTITUTION', history[0])
   }
   
   // 同时保存到独立的反馈记录（便于科研导出）
@@ -449,9 +448,9 @@ const submitFeedback = () => {
     timestamp: new Date().toISOString(),
     listenDuration: listenDuration.value
   }
-  const feedbacks = JSON.parse(localStorage.getItem('wuyin_feedback') || '[]')
+  const feedbacks = storage.get('FEEDBACK') || []
   feedbacks.push(feedbackRecord)
-  localStorage.setItem('wuyin_feedback', JSON.stringify(feedbacks))
+  storage.set('FEEDBACK', feedbacks)
   
   feedbackSubmitted.value = true
   showFeedback.value = false
