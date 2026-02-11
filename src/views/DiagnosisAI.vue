@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, ScanFace, ScanLine, BrainCircuit, ChevronRight } from 'lucide-vue-next'
 import CameraCapture from '../components/CameraCapture.vue'
 import { CONSTITUTIONS } from '../data/constitutions.js'
+import { storage } from '../utils/storage.js'
 
 const router = useRouter()
 
@@ -63,12 +64,12 @@ const saveToHistory = (result) => {
     }
     
     // Save current for Home page
-    localStorage.setItem('wuyin_current_constitution', JSON.stringify(record))
+    storage.set('CONSTITUTION', record)
 
     // Append to history
-    const history = JSON.parse(localStorage.getItem('wuyin_history') || '[]')
+    const history = storage.get('HISTORY') || []
     history.unshift(record)
-    localStorage.setItem('wuyin_history', JSON.stringify(history))
+    storage.set('HISTORY', history)
 }
 
 const analyzeImages = async () => {
