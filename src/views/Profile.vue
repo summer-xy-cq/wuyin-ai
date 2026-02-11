@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { History, Crown, Settings, ChevronRight, ChevronDown, ChevronUp, Trash2, LogOut, UserCircle, Lock, ClipboardCheck, Database } from 'lucide-vue-next'
 import ConstitutionTrendChart from '../components/ConstitutionTrendChart.vue'
+import { storage } from '../utils/storage.js'
 
 const router = useRouter()
 const isVip = ref(false)
@@ -32,7 +33,7 @@ onMounted(() => {
   const isDemoMode = location.search.includes('demo=1')
   isVip.value = isDemoMode || localStorage.getItem('wuyin_vip') === 'true'
 
-  const historyData = localStorage.getItem('wuyin_history')
+  const historyData = storage.get('HISTORY')
   if (historyData) {
     history.value = JSON.parse(historyData)
     
@@ -64,9 +65,9 @@ const confirmExport = () => {
         exportDate: new Date().toISOString(),
         user: user.value,
         vip: isVip.value,
-        research: JSON.parse(localStorage.getItem('wuyin_research') || 'null'),
-        history: JSON.parse(localStorage.getItem('wuyin_history') || '[]'),
-        feedback: JSON.parse(localStorage.getItem('wuyin_feedback') || '[]')
+        research: storage.get('RESEARCH'),
+        history: storage.get('HISTORY') || [],
+        feedback: storage.get('FEEDBACK') || []
     }
 
     const fileName = `wuyin_research_data_${new Date().toISOString().split('T')[0]}.json`
@@ -89,7 +90,7 @@ const exportData = () => {
 
 const handleLogout = () => {
     if (confirm('退出登录将清除本地缓存的所有数据（相当于重置应用）。确定要退出吗？')) {
-        localStorage.clear()
+        storage.clear()
         location.reload()
     }
 }
@@ -108,14 +109,14 @@ const openDeleteModal = (index) => {
 const confirmDelete = () => {
   if (deleteTargetIndex.value === null) return
   history.value.splice(deleteTargetIndex.value, 1)
-  localStorage.setItem('wuyin_history', JSON.stringify(history.value))
+  storage.set('HISTORY', history.value)
   
   // 如果删除了第一条，需更新 Current Constitution (虽 Profile 不负责播放，但保持数据一致性)
   if (deleteTargetIndex.value === 0) {
     if (history.value.length > 0) {
-      localStorage.setItem('wuyin_current_constitution', JSON.stringify(history.value[0]))
+      storage.set('CONSTITUTION', history.value[0])
     } else {
-      localStorage.removeItem('wuyin_current_constitution')
+      storage.remove('CONSTITUTION')
     }
   }
   showDeleteModal.value = false
@@ -124,12 +125,13 @@ const confirmDelete = () => {
 
 const confirmClearHistory = () => {
     history.value = []
-    localStorage.removeItem('wuyin_history')
-    localStorage.removeItem('wuyin_current_constitution')
-    localStorage.removeItem('wuyin_daily_usage')
-    localStorage.removeItem('wuyin_feedback')
+    storage.remove('HISTORY')
+    storage.remove('CONSTITUTION')
+    storage.remove('DAILY_USAGE')
+    storage.remove('FEEDBACK')
+    storage.remove('RESEARCH')
+    // wuyin_answers 不在 STORAGE_KEYS 中，保留原样
     localStorage.removeItem('wuyin_answers')
-    localStorage.removeItem('wuyin_research')
     showClearHistoryModal.value = false
 }
 
@@ -139,7 +141,7 @@ const updateRating = (index, rating) => {
   record.feedback.rating = rating
   
   // Persist
-  localStorage.setItem('wuyin_history', JSON.stringify(history.value))
+  storage.set('HISTORY', history.value)
 }
 </script>
 
