@@ -58,7 +58,9 @@ const prevQuestion = () => {
 // 提交
 const submit = () => {
   // 保存最终答案
+  console.log('[Assessment] Submitting answers:', answers.value)
   storage.set('ANSWERS', answers.value)
+  console.log('[Assessment] ANSWERS saved, verifying:', storage.get('ANSWERS'))
   localStorage.setItem('wuyin_question_version', isVip.value ? 'vip' : 'free')
   // 清除临时答案
   storage.remove('ANSWERS_TEMP')

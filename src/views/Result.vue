@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
-import { Radar } from 'vue-chartjs'
+import { Chart } from 'vue-chartjs'
 import { QUESTIONS_FREE } from '../data/questions-free.js'
 import { CONSTITUTIONS } from '../data/constitutions.js'
 import { getFullAssessment } from '../utils/scoring.js'
@@ -241,8 +241,10 @@ const chartOptions = {
 
 // 雷达图数据
 const chartData = computed(() => {
+  console.log('[Chart] result.value:', result.value)
   if (!result.value) return { labels: [], datasets: [] }
-  
+
+  console.log('[Chart] scores:', result.value.scores)
   return {
     labels: Object.values(CONSTITUTIONS).map(c => c.name),
     datasets: [{
@@ -265,8 +267,11 @@ const loadData = () => {
     // Actually, check storage first.
     const current = storage.get('CONSTITUTION')
     const answers = storage.get('ANSWERS')
-    
+
+    console.log('[Result] loadData:', { current: !!current, answers: !!answers, answersData: answers })
+
     if (!current && !answers) {
+        console.log('[Result] No data found, redirecting to assessment')
         result.value = null
         loading.value = false
         return
@@ -324,7 +329,8 @@ const calculateResult = () => {
   
   // 统一使用国标卷
   result.value = getFullAssessment(answers, QUESTIONS_FREE)
-  
+  console.log('[Result] Calculated result:', result.value)
+
   // 保存体质历史记录
   const historyRecord = {
     date: new Date().toISOString(),
@@ -520,7 +526,7 @@ const submitFeedback = () => {
         <section class="card p-6 animate-fade-in-up" style="animation-delay: 0.1s">
           <h3 class="font-serif font-bold text-lg text-ink mb-4 text-center">体质全景分析</h3>
           <div class="h-64 relative">
-            <Radar :data="chartData" :options="chartOptions" :class="{ 'blur-sm opacity-50': !isVip }" />
+            <Chart type="radar" :data="chartData" :options="chartOptions" :class="{ 'blur-sm opacity-50': !isVip }" />
             
             <!-- VIP 锁 -->
             <div v-if="!isVip" class="absolute inset-0 flex flex-col items-center justify-center z-10">
