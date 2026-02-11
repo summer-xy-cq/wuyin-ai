@@ -328,8 +328,10 @@ const playerBgClass = computed(() => {
 
 
 onMounted(() => {
-  isVip.value = localStorage.getItem('wuyin_vip') === 'true'
-  
+  // 演示模式：URL包含 ?demo=1 时自动解锁VIP
+  const isDemoMode = location.search.includes('demo=1')
+  isVip.value = isDemoMode || localStorage.getItem('wuyin_vip') === 'true'
+
   // Check retest
   if (shouldRetest.value) {
       showRetestModal.value = true

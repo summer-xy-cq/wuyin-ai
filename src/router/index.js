@@ -34,19 +34,11 @@ const routes = [
         name: 'Theory',
         component: () => import('../views/Theory.vue')
     },
-    { path: '/diagnosis', component: () => import('../views/Diagnosis.vue') },
-    { path: '/result', component: () => import('../views/Result.vue') },
-    { path: '/profile', component: () => import('../views/Profile.vue') },
     { path: '/diagnosis-ai', component: () => import('../views/DiagnosisAI.vue') },
     {
         path: '/assessment',
         name: 'Assessment',
         component: () => import('../views/Assessment.vue')
-    },
-    {
-        path: '/result', // 保持旧路由以防外部链接或特定跳转，但通常应用内会用 Tab
-        name: 'Result', // 或许可以重定向到 Tab?
-        component: () => import('../views/Result.vue')
     },
     {
         path: '/tongue',
