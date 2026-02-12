@@ -35,7 +35,7 @@ onMounted(() => {
 
   const historyData = storage.get('HISTORY')
   if (historyData) {
-    history.value = JSON.parse(historyData)
+    history.value = historyData
     
     // Calculate persisted days (unique dates in history)
     const uniqueDates = new Set(history.value.map(item => {
