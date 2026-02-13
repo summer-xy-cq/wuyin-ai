@@ -80,7 +80,7 @@ const PSQI_QUESTIONS = [
     id: 'psqi_4',
     type: 'single',
     label: '过去一周，您的睡眠效率（睡眠时间/在床时间）大约是？',
-    options: ['>85%', '145-84%', '65-144%', '<65%'],
+    options: ['>85%（很好）', '75%-85%（较好）', '65%-74%（一般）', '<65%（较差）'],
     category: 'sleep_efficiency'
   },
   {

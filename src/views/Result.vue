@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, onActivated } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, onActivated, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Play, Pause, RefreshCw, Music, Home, Loader2, Star, Sparkles, Lock, Crown, Repeat, SkipForward, AlertCircle } from 'lucide-vue-next'
 import {
@@ -170,18 +170,31 @@ watch(musicType, () => {
     currentTime.value = 0
   }
   currentTrackIndex.value = 0 // Reset index when switching types
+  // 艹！切换音乐类型时必须重置评价状态
+  hasPromptedFeedback.value = false
+  feedbackSubmitted.value = false
+  rating.value = 0
 })
 
 const selectTrack = (index) => {
+    console.log('[Result] selectTrack 被调用, 从', currentTrackIndex.value, '切换到', index)
     if (currentTrackIndex.value === index) return
     currentTrackIndex.value = index
-    
+
+    // 艹！切换曲目时必须重置评价状态，否则后续曲目不会弹出评价弹窗
+    hasPromptedFeedback.value = false
+    feedbackSubmitted.value = false
+    rating.value = 0
+
+    // 清除上一首的进度缓存（因为曲目已经切换）
+    localStorage.removeItem('wuyin_playback_progress')
+
     if(audioPlayer.value) {
         audioPlayer.value.pause()
         isPlaying.value = false
     }
     currentTime.value = 0
-    
+
     setTimeout(() => {
         if(audioPlayer.value) {
             audioPlayer.value.play().catch(e => console.error('Playback failed', e))
@@ -191,10 +204,14 @@ const selectTrack = (index) => {
 }
 
 const switchTrack = () => {
+    console.log('[Result] switchTrack 被调用, 当前曲目:', currentTrackIndex.value)
     if (musicType.value === 'ai') return // AI music usually single stream per type
-    
+
     const tracks = result.value.primary.constitution.tracks || []
     if (tracks.length <= 1) return
+
+    // 保存当前曲目的播放进度
+    savePlaybackProgress()
 
     // Pause current
     if (audioPlayer.value) {
@@ -204,14 +221,26 @@ const switchTrack = () => {
 
     // Switch index
     currentTrackIndex.value = (currentTrackIndex.value + 1) % tracks.length
-    
+    console.log('[Result] 切换到曲目:', currentTrackIndex.value)
+
     // Reset progress
     currentTime.value = 0
+
+    // 清除上一首的进度缓存（因为曲目已经切换）
+    localStorage.removeItem('wuyin_playback_progress')
+
+    // 艹！切换曲目时必须重置评价状态，否则后续曲目不会弹出评价弹窗
+    hasPromptedFeedback.value = false
+    feedbackSubmitted.value = false
+    rating.value = 0
+    console.log('[Result] 重置评价状态: hasPromptedFeedback=false, feedbackSubmitted=false')
+
     // Auto play new track after short delay
     setTimeout(() => {
         if(audioPlayer.value) {
             audioPlayer.value.play().catch(e => console.error('Playback failed', e))
             isPlaying.value = true
+            console.log('[Result] 开始播放新曲目')
         }
     }, 300)
 }
@@ -299,9 +328,81 @@ onMounted(() => {
   loadData()
 })
 
+// 恢复播放进度（切换页面回来时继续播放）
 onActivated(() => {
-    loadData()
+    // 检查数据是否已加载，如果已加载则恢复进度
+    if (result.value) {
+        console.log('[Result] onActivated 触发，数据已加载，尝试恢复播放进度')
+        restorePlaybackProgress()
+    } else {
+        console.log('[Result] onActivated 触发，数据未加载，调用 loadData')
+        loadData()
+    }
 })
+
+// 保存播放进度到缓存
+const savePlaybackProgress = () => {
+    if (!audioPlayer.value || !result.value) return
+
+    const progressData = {
+        currentTime: currentTime.value,
+        duration: duration.value,
+        isPlaying: isPlaying.value,
+        trackIndex: currentTrackIndex.value,
+        musicType: musicType.value,
+        trackTitle: currentMusic.value?.title,  // 保存曲目标题，用于恢复时判断
+        timestamp: new Date().toISOString()
+    }
+
+    // 保存到本地存储
+    localStorage.setItem('wuyin_playback_progress', JSON.stringify(progressData))
+    console.log('[Result] 保存播放进度:', progressData)
+}
+
+// 恢复播放进度
+const restorePlaybackProgress = () => {
+    console.log('[Result] restorePlaybackProgress 被调用, result.value:', !!result.value, 'audioPlayer.value:', !!audioPlayer.value)
+
+    const saved = localStorage.getItem('wuyin_playback_progress')
+    if (!saved) {
+        console.log('[Result] 没有保存的进度')
+        return
+    }
+    if (!result.value) {
+        console.log('[Result] result.value 为空，不恢复')
+        return
+    }
+
+    try {
+        const progressData = JSON.parse(saved)
+        console.log('[Result] 恢复进度数据:', progressData)
+
+        // 检查是否是同一次会话的数据（检查曲目是否相同）
+        const currentTrackTitle = currentMusic.value?.title
+        console.log('[Result] 当前曲目标题:', currentTrackTitle, '保存的曲目标题:', progressData.trackTitle)
+
+        if (progressData.trackTitle !== currentTrackTitle) {
+            console.log('[Result] 曲目不同，不恢复进度')
+            return
+        }
+
+        // 恢复进度
+        if (audioPlayer.value && progressData.currentTime > 0) {
+            audioPlayer.value.currentTime = progressData.currentTime
+            currentTime.value = progressData.currentTime
+
+            // 如果之前在播放，恢复播放状态
+            if (progressData.isPlaying) {
+                audioPlayer.value.play().catch(e => console.error('恢复播放失败', e))
+                isPlaying.value = true
+            }
+
+            console.log('[Result] 恢复播放进度成功:', progressData)
+        }
+    } catch (e) {
+        console.error('[Result] 恢复播放进度失败:', e)
+    }
+}
 
 // 计算结果
 const calculateResult = () => {
@@ -392,17 +493,21 @@ const calculateResult = () => {
 // 播放控制
 const togglePlay = () => {
   if (!audioPlayer.value) return
-  
+
   if (isPlaying.value) {
     audioPlayer.value.pause()
   } else {
     audioPlayer.value.play().catch(e => console.error('Playback failed', e))
   }
   isPlaying.value = !isPlaying.value
+
+  // 保存播放进度
+  savePlaybackProgress()
 }
 
 // 播放结束 - 触发评价弹窗
 const onAudioEnded = () => {
+  console.log('[Result] onAudioEnded 触发, feedbackSubmitted:', feedbackSubmitted.value, 'listenDuration:', listenDuration.value)
   isPlaying.value = false
 
   // 切换曲目时重置评价状态
@@ -411,6 +516,7 @@ const onAudioEnded = () => {
 
   // 触发评价弹窗
   if (!feedbackSubmitted.value && listenDuration.value > 0) {
+    console.log('[Result] 显示评价弹窗')
     showFeedback.value = true
 
     // 保存播放数据到缓存
@@ -422,6 +528,8 @@ const onAudioEnded = () => {
       trackIndex: currentTrackIndex.value,
       timestamp: new Date().toISOString()
     })
+  } else {
+    console.log('[Result] 不显示评价弹窗: feedbackSubmitted=', feedbackSubmitted.value, 'listenDuration=', listenDuration.value)
   }
 }
 
@@ -491,12 +599,17 @@ watch(isPlaying, (val) => {
     stopTimer()
     // 暂停时立即保存数据（用户可能切走）
     savePlaybackData()
+    // 保存播放进度（用于切换页面后继续播放）
+    savePlaybackProgress()
   }
 })
 
 // 组件卸载时清除计时器并自动保存播放数据
 onUnmounted(() => {
   stopTimer()
+
+  // 保存播放进度（切换页面时继续播放）
+  savePlaybackProgress()
 
   // 艹！用户杀App、关网页时这里可能不执行，所以前面要定期保存
   // 但还是要尽量保存一次

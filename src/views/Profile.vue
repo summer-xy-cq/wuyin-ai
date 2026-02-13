@@ -37,7 +37,7 @@ onMounted(() => {
   const historyData = storage.get('HISTORY')
   if (historyData) {
     history.value = historyData
-    
+
     // Calculate persisted days (unique dates in history)
     const uniqueDates = new Set(history.value.map(item => {
         const d = new Date(item.date)
@@ -45,7 +45,7 @@ onMounted(() => {
     }))
     user.value.days = uniqueDates.size || 1 // At least 1 day if they have history, or default 0/1
     if (uniqueDates.size === 0 && history.value.length > 0) user.value.days = 1
-    if (history.value.length === 0) user.value.days = 0 
+    if (history.value.length === 0) user.value.days = 0
   }
 })
 
@@ -134,6 +134,9 @@ const confirmClearHistory = () => {
     // wuyin_answers 不在 STORAGE_KEYS 中，保留原样
     localStorage.removeItem('wuyin_answers')
     showClearHistoryModal.value = false
+
+    // 清空数据后刷新页面，确保首页的今日音疗时长也清空
+    location.reload()
 }
 
 const updateRating = (index, rating) => {
@@ -369,8 +372,8 @@ const updateRating = (index, rating) => {
         
         <!-- 展开/收起按钮 -->
         <div v-if="history.length > 3" class="mt-4 text-center">
-            <button 
-                @click="showAllHistory = !showAllHistory" 
+            <button
+                @click="showAllHistory = !showAllHistory"
                 class="inline-flex items-center gap-1 text-sm text-ink-light hover:text-ink transition-colors pb-1 border-b border-transparent hover:border-ink/20"
             >
                 <span>{{ showAllHistory ? '收起记录' : '查看更多历史记录' }}</span>
@@ -378,8 +381,8 @@ const updateRating = (index, rating) => {
             </button>
         </div>
       </section>
-      
-      <div v-else class="text-center py-10 text-ink-light">
+
+      <div v-else-if="history.length === 0" class="text-center py-10 text-ink-light">
         <p>暂无测评记录</p>
         <button @click="router.push('/diagnosis')" class="mt-4 text-cinnabar text-sm hover:underline">去进行第一次问诊</button>
       </div>

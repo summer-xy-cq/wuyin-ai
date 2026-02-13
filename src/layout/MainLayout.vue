@@ -25,7 +25,7 @@ const isActive = (path) => route.path.startsWith(path)
     <main class="flex-1 pb-20">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
-          <keep-alive include="Home">
+          <keep-alive include="Home,Result">
             <component :is="Component" />
           </keep-alive>
         </transition>

@@ -16,6 +16,13 @@ const loadData = () => {
     currentConstitution.value = storage.get('CONSTITUTION')
 }
 
+// 开始体质测评 - 清空之前的临时答案
+const startAssessment = () => {
+    // 清空临时答案，确保重新开始
+    storage.remove('ANSWERS_TEMP')
+    router.push('/assessment')
+}
+
 // 初始化
 onMounted(() => {
   loadData()
@@ -90,11 +97,35 @@ const researchRating = ref({ sleep: 5, anxiety: 5, mood: 5 })
 const researchNote = ref('')
 const researchSubmitted = ref(false)
 
+// 是否是科研用户
+const isResearchUser = computed(() => {
+    const data = storage.get('RESEARCH') || {}
+    return data.status === 'active'
+})
+
+// 已完成天数
+const completedDays = computed(() => {
+    const data = storage.get('RESEARCH') || {}
+    return (data.logs || []).length
+})
+
 // === 音乐评价弹窗 ===
 const showFeedbackModal = ref(false)
 const feedbackRating = ref(0)
 const feedbackTrackTitle = ref('')
 const feedbackSource = ref('') // 'library' 或 'rhythm'
+
+// === Toast 提示 ===
+const showToast = ref(false)
+const toastMessage = ref('')
+
+const toast = (msg) => {
+    toastMessage.value = msg
+    showToast.value = true
+    setTimeout(() => {
+        showToast.value = false
+    }, 3000)
+}
 
 const checkResearchStatus = () => {
     const data = storage.get('RESEARCH') || {}
@@ -153,7 +184,21 @@ watch(dailyListenTime, (val) => {
 
 // 监听暂停（用户可能听完准备离开）
 watch(isPlaying, (val) => {
-    if (!val) { // Paused
+    if (!val) { // Paused or stopped
+        // 检查是否需要弹出评价弹窗（听了超过30秒）
+        if (dailyListenTime.value >= 30 && currentConstitution.value && !showFeedbackModal.value) {
+            if (isResearchUser.value) {
+                // 科研用户：提示去测试结果页面评分
+                console.log('[Home] 科研用户，提示去测试结果页面评分')
+                toast('科研数据请前往测试结果页面评分')
+            } else {
+                // 普通用户：显示评价弹窗
+                console.log('[Home] 普通用户，触发评价弹窗')
+                feedbackTrackTitle.value = currentMusic.value?.title || '未知曲目'
+                feedbackSource.value = 'home'
+                showFeedbackModal.value = true
+            }
+        }
         checkResearchStatus()
     }
 })
@@ -274,6 +319,10 @@ const currentMusic = computed(() => {
 // Switch track function
 const selectTrack = (index) => {
     if (currentTrackIndex.value === index) return
+
+    // 艹！必须重置十二时辰播放状态，否则会继续播放十二时辰音乐
+    playingRhythm.value = false
+
     currentTrackIndex.value = index
     // If playing, pause and restart? or just auto play new track?
     // Let's stop first to be safe
@@ -282,7 +331,7 @@ const selectTrack = (index) => {
         isPlaying.value = false
     }
     currentTime.value = 0
-    
+
     setTimeout(() => {
         if(audioPlayer.value) {
             audioPlayer.value.play().catch(e => console.error(e))
@@ -437,33 +486,68 @@ watch(currentTime, (newTime) => {
     }
 })
 
-// 音频播放结束 - 暂时禁用弹窗，等待科研用户主动评价
+// 音频播放结束 - 触发评价弹窗
 const onAudioEnded = () => {
   isPlaying.value = false
-  // TODO: 科研用户需要主动去"我的"页面进行评价
-  // 暂时不在此处弹窗打扰普通用户
-  console.log('[Home] 音乐播放完成')
+
+  console.log('[Home] onAudioEnded 触发, currentConstitution:', !!currentConstitution.value, 'currentMusic:', currentMusic.value?.title)
+
+  // 只有体质测评后的用户才弹出评价弹窗
+  if (!currentConstitution.value) {
+    console.log('[Home] 无体质信息，跳过评价弹窗')
+    return
+  }
+
+  // 设置评价曲目的标题
+  feedbackTrackTitle.value = currentMusic.value?.title || '未知曲目'
+  feedbackSource.value = 'home'
+
+  // 触发评价弹窗
+  showFeedbackModal.value = true
+  console.log('[Home] 显示评价弹窗，showFeedbackModal:', showFeedbackModal.value)
 }
 
 // 提交评价
 const submitFeedback = () => {
   if (!feedbackTrackTitle.value || feedbackRating.value === 0) return
 
-  // 保存到反馈记录
+  // 获取体质信息
+  const c = currentConstitution.value
+
+  // 保存到反馈记录（完整数据，用于科研）
   const feedbackRecord = {
-    source: feedbackSource.value,
+    source: feedbackSource.value || 'home',
+    // 体质信息
+    constitution: c?.constitutionKey || c?.key || '',
+    constitutionName: c?.constitutionName || '',
+    toneName: c?.toneName || '',
+    tone: c?.tone || '',
+    tendencies: c?.tendencies || [],
+    // 曲目信息
     trackTitle: feedbackTrackTitle.value,
-    timestamp: new Date().toISOString(),
-    rating: feedbackRating.value
+    musicType: musicType.value,
+    // 评价信息
+    rating: feedbackRating.value,
+    ratingLabel: getRatingLabel(feedbackRating.value),
+    listenDuration: dailyListenTime.value,
+    timestamp: new Date().toISOString()
   }
 
   const feedbacks = storage.get('FEEDBACK') || []
   feedbacks.push(feedbackRecord)
   storage.set('FEEDBACK', feedbacks)
 
+  console.log('[Home] 评价已保存:', feedbackRecord)
+
   // 关闭弹窗
   showFeedbackModal.value = false
   feedbackRating.value = 0
+}
+
+// 评分标签
+const getRatingLabel = (score) => {
+  const labels = { 1: '很差', 2: '较差', 3: '一般', 4: '较好', 5: '很好' }
+  return labels[score] || ''
 }
 
 // 跳过评价
@@ -560,6 +644,13 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen bg-paper relative overflow-hidden pb-10">
+    <!-- Toast 提示 -->
+    <transition name="fade">
+        <div v-if="showToast" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-ink text-white px-4 py-2 rounded-full shadow-lg text-sm">
+            {{ toastMessage }}
+        </div>
+    </transition>
+
     <!-- 水墨背景装饰 -->
     <div class="absolute inset-0 pointer-events-none">
       <div class="absolute top-0 right-0 w-96 h-96 bg-gradient-radial from-cinnabar/5 to-transparent rounded-full blur-3xl"></div>
@@ -784,20 +875,42 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <!-- 每日和谐度 (原修身进度) -->
-          <div class="bg-ink/5 rounded-xl p-3">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold text-ink-light">今日和谐度</span>
-              <span class="text-xs font-bold" :class="dailyListenTime >= dailyTarget ? 'text-jade' : 'text-ink'">
-                {{ Math.floor(dailyListenTime / 60) }}/15 min
-              </span>
+          <!-- 播放进度条（十二时辰养生音乐播放时显示） -->
+          <div v-if="playingRhythm && rhythmTrack?.src" class="mt-4">
+            <div
+                @click="seekTo"
+                class="h-1.5 bg-ink/10 rounded-full cursor-pointer group relative"
+            >
+                <div
+                  class="h-full rounded-full transition-all relative bg-cinnabar"
+                  :style="{ width: progress + '%' }"
+                ></div>
             </div>
-            <div class="relative h-2 bg-white rounded-full overflow-hidden">
-              <div 
-                class="absolute top-0 left-0 h-full bg-gradient-to-r from-jade to-jade-light transition-all duration-1000 ease-out"
-                :style="{ width: dailyProgressPercent + '%' }"
-              ></div>
+            <div class="flex justify-between mt-1">
+               <span class="text-[10px] text-ink-light font-mono">{{ formatTime(currentTime) }}</span>
+               <span class="text-[10px] text-ink-light font-mono">{{ formatTime(duration) }}</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 今日音疗时长 -->
+      <section class="card p-4 mb-6 animate-fade-in-up bg-gradient-to-r from-jade/5 to-jade-light/5 border border-jade/10" style="animation-delay: 0.23s">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-jade/10 flex items-center justify-center">
+              <Music class="w-5 h-5 text-jade" />
+            </div>
+            <div>
+              <div class="text-base font-bold text-ink">今日音疗</div>
+              <div class="text-xs text-ink-light">点击曲目开始聆听</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-3xl font-bold text-jade font-mono">
+              {{ Math.floor(dailyListenTime / 60) }}:{{ (dailyListenTime % 60).toString().padStart(2, '0') }}
+            </div>
+            <div class="text-xs text-jade/70">累计时长</div>
           </div>
         </div>
       </section>
@@ -843,7 +956,7 @@ onUnmounted(() => {
           <Music class="w-8 h-8 text-ink-light" />
         </div>
         <p class="text-ink-light mb-4">完成体质测评，获取专属音乐推荐</p>
-        <button @click="router.push('/assessment')" class="btn-primary">
+        <button @click="startAssessment" class="btn-primary">
           开始测评
         </button>
       </section>
@@ -899,7 +1012,7 @@ onUnmounted(() => {
              </p>
              <div class="flex gap-3">
                 <button @click="showRetestModal = false" class="flex-1 py-3 border rounded-xl text-ink-light">稍后再说</button>
-                <button @click="router.push('/assessment')" class="flex-1 py-3 bg-cinnabar text-white rounded-xl font-bold shadow-md shadow-cinnabar/20">立即复测</button>
+                <button @click="startAssessment" class="flex-1 py-3 bg-cinnabar text-white rounded-xl font-bold shadow-md shadow-cinnabar/20">立即复测</button>
              </div>
         </div>
       </div>
@@ -913,38 +1026,55 @@ onUnmounted(() => {
 
              <div class="p-6">
                 <div v-if="!researchSubmitted">
-                     <div class="flex items-center justify-center gap-2 mb-4 text-indigo-600">
-                        <ClipboardCheck class="w-6 h-6" />
-                        <span class="font-bold text-lg">每日科研打卡</span>
+                     <div class="text-center mb-4">
+                        <div class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 rounded-full text-indigo-600 mb-3">
+                            <ClipboardCheck class="w-5 h-5" />
+                            <span class="font-bold text-sm">每日科研打卡</span>
+                        </div>
+                        <p class="text-sm text-ink-light">今日已聆听 {{ Math.floor(dailyListenTime / 60) }} 分钟，请记录您的感受</p>
                      </div>
-                     <p class="text-center text-sm text-ink-light mb-6">今日听音任务已完成，请简单记录感受</p>
 
-                     <div class="space-y-4 mb-6">
+                     <div class="space-y-5 mb-6">
                         <div>
-                            <div class="flex justify-between text-xs text-ink-light mb-1">
+                            <div class="flex justify-between text-xs text-ink-light mb-2">
                                 <span>睡眠改善</span>
-                                <span class="font-bold text-indigo-600">{{ researchRating.sleep }}</span>
+                                <span class="font-bold text-indigo-600">{{ researchRating.sleep }}/10</span>
                             </div>
-                            <input type="range" min="0" max="10" v-model.number="researchRating.sleep" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <input type="range" min="0" max="10" v-model.number="researchRating.sleep" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <div class="flex justify-between text-[10px] text-ink-light/50 mt-1">
+                                <span>更差</span>
+                                <span>无变化</span>
+                                <span>改善</span>
+                            </div>
                         </div>
                         <div>
-                            <div class="flex justify-between text-xs text-ink-light mb-1">
+                            <div class="flex justify-between text-xs text-ink-light mb-2">
                                 <span>焦虑缓解</span>
-                                <span class="font-bold text-indigo-600">{{ researchRating.anxiety }}</span>
+                                <span class="font-bold text-indigo-600">{{ researchRating.anxiety }}/10</span>
                             </div>
-                            <input type="range" min="0" max="10" v-model.number="researchRating.anxiety" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <input type="range" min="0" max="10" v-model.number="researchRating.anxiety" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <div class="flex justify-between text-[10px] text-ink-light/50 mt-1">
+                                <span>更焦虑</span>
+                                <span>无变化</span>
+                                <span>缓解</span>
+                            </div>
                         </div>
                         <div>
-                            <div class="flex justify-between text-xs text-ink-light mb-1">
+                            <div class="flex justify-between text-xs text-ink-light mb-2">
                                 <span>心情愉悦</span>
-                                <span class="font-bold text-indigo-600">{{ researchRating.mood }}</span>
+                                <span class="font-bold text-indigo-600">{{ researchRating.mood }}/10</span>
                             </div>
-                            <input type="range" min="0" max="10" v-model.number="researchRating.mood" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <input type="range" min="0" max="10" v-model.number="researchRating.mood" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <div class="flex justify-between text-[10px] text-ink-light/50 mt-1">
+                                <span>更低落</span>
+                                <span>无变化</span>
+                                <span>更愉悦</span>
+                            </div>
                         </div>
                         <input
                             v-model="researchNote"
                             placeholder="其他感受（选填）"
-                            class="w-full p-2 bg-ink/5 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            class="w-full p-3 bg-ink/5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                      </div>
 
@@ -957,9 +1087,11 @@ onUnmounted(() => {
                 </div>
 
                 <div v-else class="text-center py-8">
-                    <CheckCircle2 class="w-12 h-12 text-green-500 mx-auto mb-3" />
-                    <h3 class="font-bold text-ink text-lg">打卡成功</h3>
-                    <p class="text-sm text-ink-light">感谢您的参与，离VIP奖励更近一步！</p>
+                    <div class="w-16 h-16 mx-auto mb-4 bg-green-50 rounded-full flex items-center justify-center">
+                        <CheckCircle2 class="w-8 h-8 text-green-500" />
+                    </div>
+                    <h3 class="font-bold text-ink text-lg mb-2">打卡成功！</h3>
+                    <p class="text-sm text-ink-light">已完成 {{ completedDays }}/7 天科研记录</p>
                 </div>
              </div>
         </div>
