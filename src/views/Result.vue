@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Play, Pause, RefreshCw, Music, Home, Loader2, Star, Sparkles, Lock, Crown, Repeat, SkipForward } from 'lucide-vue-next'
+import { ArrowLeft, Play, Pause, RefreshCw, Music, Home, Loader2, Star, Sparkles, Lock, Crown, Repeat, SkipForward, AlertCircle } from 'lucide-vue-next'
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -16,7 +16,7 @@ import { QUESTIONS_FREE } from '../data/questions-free.js'
 import { CONSTITUTIONS } from '../data/constitutions.js'
 import { getFullAssessment } from '../utils/scoring.js'
 import { getAIMusicByConstitution } from '../data/ai-music.js'
-import { storage } from '../utils/storage.js'
+import { storage, playbackCache } from '../utils/storage.js'
 
 const TONE_COLORS = {
   '宫': 'from-amber-500 via-orange-500 to-yellow-600', // Earth - Yellow
@@ -46,6 +46,13 @@ const showVipModal = ref(false)
 
 const isLooping = ref(false)
 const currentTrackIndex = ref(0)
+
+// 评价弹窗相关
+const hasPromptedFeedback = ref(false)        // 是否已触发过评价弹窗
+const sessionId = ref(Date.now().toString())  // 本次会话ID
+
+// 自动保存间隔（秒）- 防止数据丢失
+const AUTO_SAVE_INTERVAL = 10
 
 // VIP 状态（演示模式自动解锁）
 const isVip = ref(location.search.includes('demo=1') || localStorage.getItem('wuyin_vip') === 'true')
@@ -319,22 +326,46 @@ const calculateResult = () => {
     }
 
   const answers = storage.get('ANSWERS')
-  
+
   if (!answers) {
     router.push('/assessment')
     return
   }
-  
+
+  // 艹！检查答案数据是否完整，特禀质题目（25-27）必须存在
+  const missingQuestions = QUESTIONS_FREE.filter(q => answers[q.id] === undefined)
+  if (missingQuestions.length > 0) {
+    console.error('[Result] 艹！答案数据不完整，缺少题目:', missingQuestions.map(q => ({id: q.id, type: q.type})))
+    // 如果缺少题目，删除脏数据，让用户重新答题
+    storage.remove('ANSWERS')
+    storage.remove('CONSTITUTION')
+    router.push('/assessment')
+    return
+  }
+
+  console.log('[Result] 答案数据完整，开始计算...')
+  console.log('[Result] 完整答案数据:', JSON.stringify(answers))
+  console.log('[Result] 特禀质题目答案:', {
+    25: answers[25],
+    26: answers[26],
+    27: answers[27]
+  })
+
   const version = 'GB/T 46939-2025' // 国标版本
-  
+
   // 统一使用国标卷
-  result.value = getFullAssessment(answers, QUESTIONS_FREE)
+  const assessmentResult = getFullAssessment(answers, QUESTIONS_FREE)
+  console.log('[Result] getFullAssessment 原始返回:', assessmentResult)
+  result.value = assessmentResult
   console.log('[Result] Calculated result:', result.value)
   console.log('[Result] Primary constitution:', result.value.primary.key, 'score:', result.value.scores.transformed[result.value.primary.key])
   console.log('[Result] All scores:', result.value.scores.transformed)
   console.log('[Result] Tendencies:', result.value.tendencies)
 
   // 保存体质历史记录
+  // 艹！这里要保存当前播放的曲目，不然Profile页面显示"未知曲目"
+  const currentTrack = result.value.primary.constitution.tracks?.[0] || null
+
   const historyRecord = {
     date: new Date().toISOString(),
     constitutionKey: result.value.primary.key,
@@ -342,6 +373,8 @@ const calculateResult = () => {
     toneName: result.value.primary.constitution.toneName,
 
     aiMusic: getAIMusicByConstitution(result.value.primary.key),
+    traditionalMusic: currentTrack, // 保存第一首推荐曲目
+    musicType: 'traditional', // 默认传统音乐，用户可以在播放器切换
     version: version
   }
   
@@ -368,23 +401,46 @@ const togglePlay = () => {
   isPlaying.value = !isPlaying.value
 }
 
-// 播放结束
+// 播放结束 - 触发评价弹窗
 const onAudioEnded = () => {
   isPlaying.value = false
+
+  // 切换曲目时重置评价状态
+  hasPromptedFeedback.value = false
   rating.value = 0
-  feedbackSubmitted.value = false
-  showFeedback.value = true
+
+  // 触发评价弹窗
+  if (!feedbackSubmitted.value && listenDuration.value > 0) {
+    showFeedback.value = true
+
+    // 保存播放数据到缓存
+    playbackCache.save({
+      sessionId: sessionId.value,
+      listenDuration: listenDuration.value,
+      musicType: musicType.value,
+      trackTitle: currentMusic.value?.title,
+      trackIndex: currentTrackIndex.value,
+      timestamp: new Date().toISOString()
+    })
+  }
 }
 
 // 计时器相关
 let timer = null
 const listenDuration = ref(0) // 单位：秒
+let lastSaveTime = 0          // 上次保存时间
 
 // 开始计时
 const startTimer = () => {
   stopTimer()
   timer = setInterval(() => {
     listenDuration.value++
+
+    // 每10秒自动保存播放数据（防止用户杀App数据丢失）
+    if (listenDuration.value - lastSaveTime >= AUTO_SAVE_INTERVAL) {
+      savePlaybackData()
+      lastSaveTime = listenDuration.value
+    }
   }, 1000)
 }
 
@@ -396,73 +452,130 @@ const stopTimer = () => {
   }
 }
 
+// 保存播放数据（带缓存机制）
+const savePlaybackData = () => {
+  if (listenDuration.value <= 0) return
+
+  // 1. 先保存到缓存（防止丢失）
+  playbackCache.save({
+    sessionId: sessionId.value,
+    listenDuration: listenDuration.value,
+    musicType: musicType.value,
+    trackTitle: currentMusic.value?.title,
+    trackIndex: currentTrackIndex.value,
+    timestamp: new Date().toISOString()
+  })
+
+  // 2. 更新历史记录中的播放数据（不是评价数据）
+  const history = storage.get('HISTORY') || []
+  if (history.length > 0) {
+    if (!history[0].playback) {
+      history[0].playback = {}
+    }
+    history[0].playback.listenDuration = listenDuration.value
+    history[0].playback.musicType = musicType.value
+    history[0].playback.trackTitle = currentMusic.value?.title
+    history[0].playback.trackIndex = currentTrackIndex.value
+    history[0].playback.lastUpdate = new Date().toISOString()
+
+    storage.set('HISTORY', history)
+    storage.set('CONSTITUTION', history[0])
+  }
+}
+
 // 监听播放状态
 watch(isPlaying, (val) => {
   if (val) {
     startTimer()
   } else {
     stopTimer()
+    // 暂停时立即保存数据（用户可能切走）
+    savePlaybackData()
   }
 })
 
 // 组件卸载时清除计时器并自动保存播放数据
 onUnmounted(() => {
   stopTimer()
-  
-  // 即使未提交评价，只要有播放数据也保存
-  if (listenDuration.value > 0) {
-    const history = storage.get('HISTORY') || []
-    if (history.length > 0) {
-      if (!history[0].feedback) {
-        history[0].feedback = {}
-      }
-      // 仅更新时长和类型，保留其他字段（如评分）
-      history[0].feedback.listenDuration = listenDuration.value
-      history[0].feedback.musicType = musicType.value
-      
-      storage.set('HISTORY', history)
-      
-      // 同步更新当前体质
-      storage.set('CONSTITUTION', history[0])
-    }
-  }
+
+  // 艹！用户杀App、关网页时这里可能不执行，所以前面要定期保存
+  // 但还是要尽量保存一次
+  savePlaybackData()
 })
 
 // 提交反馈
 const submitFeedback = () => {
-  // 更新当前历史记录的反馈
+  // 获取兼夹体质数据
+  const tendencies = result.value?.tendencies || []
+
+  // 更新历史记录 - 保存实际播放的歌曲评价
   const history = storage.get('HISTORY') || []
   if (history.length > 0) {
-    // 找到最新的记录（刚刚创建的）
+    // 使用当前播放的歌曲信息，不是默认第一首
     history[0].feedback = {
       rating: rating.value,
       musicType: musicType.value,
       trackTitle: currentMusic.value?.title,
+      trackIndex: currentTrackIndex.value,
+      tone: currentMusic.value?.tone || result.value?.primary?.constitution?.toneName,
       timestamp: new Date().toISOString(),
       listenDuration: listenDuration.value
     }
     storage.set('HISTORY', history)
-    
-    // 同步更新当前体质
     storage.set('CONSTITUTION', history[0])
   }
-  
+
   // 同时保存到独立的反馈记录（便于科研导出）
   const feedbackRecord = {
     constitution: result.value.primary.key,
     constitutionName: result.value.primary.constitution.name,
+    toneName: result.value.primary.constitution.toneName,
+    tone: result.value.primary.constitution.tone,
+    tendencies: tendencies.map(t => ({
+      key: t.key,
+      name: t.constitution.name,
+      score: t.score
+    })),
     rating: rating.value,
+    ratingLabel: getRatingLabel(rating.value),
     musicType: musicType.value,
     trackTitle: currentMusic.value?.title,
+    trackIndex: currentTrackIndex.value,
     timestamp: new Date().toISOString(),
     listenDuration: listenDuration.value
   }
   const feedbacks = storage.get('FEEDBACK') || []
   feedbacks.push(feedbackRecord)
   storage.set('FEEDBACK', feedbacks)
-  
+
+  // 关闭评价弹窗
   feedbackSubmitted.value = true
   showFeedback.value = false
+
+  // 清除缓存
+  playbackCache.clear()
+}
+
+// 评分标签辅助函数
+const getRatingLabel = (score) => {
+  const labels = { 1: '很差', 2: '较差', 3: '一般', 4: '较好', 5: '很好' }
+  return labels[score] || ''
+}
+
+// 跳过评价（记录用户跳过了评价）
+const skipFeedback = () => {
+  const history = storage.get('HISTORY') || []
+  if (history.length > 0) {
+    if (!history[0].feedback) {
+      history[0].feedback = {}
+    }
+    history[0].feedback.skipped = true
+    history[0].feedback.skipTimestamp = new Date().toISOString()
+    history[0].feedback.listenDuration = listenDuration.value
+    storage.set('HISTORY', history)
+  }
+  showFeedback.value = false
+  hasPromptedFeedback.value = true
 }
 // End of script
 </script>
@@ -511,6 +624,17 @@ const submitFeedback = () => {
           <h1 class="font-serif font-bold text-lg text-ink">辨识结果</h1>
         </div>
       </header>
+
+      <!-- ⚠️ 医疗免责声明 -->
+      <div class="bg-amber-50 border-b border-amber-200 py-2">
+        <div class="max-w-lg mx-auto px-4 flex items-start gap-2">
+          <AlertCircle class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <p class="text-xs text-amber-800 leading-relaxed">
+            <strong class="font-bold">重要提示：</strong>本功能仅供健康调理参考，非医疗诊断。
+            分析结果不能替代专业医生的诊断和治疗建议。如有身体不适，请及时就医。
+          </p>
+        </div>
+      </div>
 
       <main class="max-w-lg mx-auto px-6 py-6 space-y-6">
         <!-- 主要体质卡片 -->
@@ -816,11 +940,16 @@ const submitFeedback = () => {
     <!-- 反馈弹窗 -->
     <div v-if="showFeedback" class="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm p-6">
       <div class="card p-6 max-w-sm w-full animate-fade-in-up">
-          <h3 class="font-serif font-bold text-lg text-ink text-center mb-4">疗效反馈</h3>
-          
+          <h3 class="font-serif font-bold text-lg text-ink text-center mb-2">疗效反馈</h3>
+
+          <!-- 显示正在评价的曲目 -->
+          <p class="text-xs text-ink-light text-center mb-4">
+            您刚刚听完《{{ currentMusic?.title }}》
+          </p>
+
           <div class="flex justify-center gap-2 mb-4">
-            <button 
-              v-for="star in 5" 
+            <button
+              v-for="star in 5"
               :key="star"
               @click="rating = star"
               class="text-3xl transition-all hover:scale-110"
@@ -829,15 +958,21 @@ const submitFeedback = () => {
               ★
             </button>
           </div>
-          
-          <p class="text-sm text-ink-light text-center mb-6">您对本次音乐疗愈的体验如何？</p>
-          
+
+          <!-- 评分提示 -->
+          <p class="text-sm text-cinnabar text-center mb-4 font-medium">
+            {{ rating === 0 ? '请点击星星评分' : '感谢您的评价！' }}
+          </p>
+
           <div class="flex gap-3">
-            <button @click="showFeedback = false" class="btn-secondary flex-1">跳过</button>
-            <button @click="submitFeedback" :disabled="rating === 0" class="btn-primary flex-1" :class="rating === 0 && 'opacity-50'">提交</button>
+            <button @click="skipFeedback" class="btn-secondary flex-1 text-sm">跳过</button>
+            <button @click="submitFeedback" :disabled="rating === 0" class="btn-primary flex-1" :class="rating === 0 && 'opacity-50'">
+              提交
+            </button>
           </div>
       </div>
     </div>
+
     <!-- VIP 升级弹窗 -->
       <div v-if="showVipModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm animate-fade-in">
         <div class="bg-paper rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">

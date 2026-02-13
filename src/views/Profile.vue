@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { History, Crown, Settings, ChevronRight, ChevronDown, ChevronUp, Trash2, LogOut, UserCircle, Lock, ClipboardCheck, Database } from 'lucide-vue-next'
 import ConstitutionTrendChart from '../components/ConstitutionTrendChart.vue'
+import ResearchStatus from '../components/ResearchStatus.vue'
 import { storage } from '../utils/storage.js'
 
 const router = useRouter()
@@ -169,8 +170,12 @@ const updateRating = (index, rating) => {
         </div>
       </div>
 
-      <!-- 科研体验官入口 -->
-      <section 
+      <!-- 科研计划状态 -->
+      <ResearchStatus />
+
+      <!-- 科研入口 -->
+      <section
+        v-if="!storage.get('RESEARCH')"
         @click="router.push('/research')"
         class="card p-5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 cursor-pointer active:scale-95 transition-transform group"
       >
@@ -295,10 +300,10 @@ const updateRating = (index, rating) => {
                         <span class="text-xs text-ink-light ml-2">{{ formatDate(record.date) }}</span>
                     </div>
                      <div class="text-xs text-ink-light mt-1 flex items-center justify-between">
-                        <!-- 显示乐曲信息 -->
+                        <!-- 显示乐曲信息 - 优先显示用户实际听完评价的曲目 -->
                          <div class="flex items-center gap-1">
                             <span class="w-1.5 h-1.5 rounded-full" :class="record.toneName === '宫' ? 'bg-gold' : 'bg-jade'"></span>
-                            <span>{{ record.traditionalMusic?.title || '未知曲目' }}</span>
+                            <span>{{ record.feedback?.trackTitle || record.traditionalMusic?.title || '未知曲目' }}</span>
                          </div>
                          <!-- 评分与时长展示 (Collapsed State) -->
                          <div class="flex items-center gap-3">

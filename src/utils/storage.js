@@ -12,7 +12,8 @@ export const STORAGE_KEYS = {
   DAILY_USAGE: 'wuyin_daily_usage',
   FEEDBACK: 'wuyin_feedback',
   ANSWERS: 'wuyin_answers',
-  ANSWERS_TEMP: 'wuyin_answers_temp'
+  ANSWERS_TEMP: 'wuyin_answers_temp',
+  PLAYBACK_CACHE: 'wuyin_playback_cache'      // 播放数据缓存（防丢失）
 }
 
 /**
@@ -80,6 +81,66 @@ export const storage = {
     } catch (e) {
       console.error('[storage] Clear error:', e)
     }
+  }
+}
+
+/**
+ * 播放数据缓存系统 - 防止数据丢失
+ * 艹！用户杀App、关网页时 onUnmounted 根本不触发，必须定期保存！
+ */
+export const playbackCache = {
+  /**
+   * 缓存播放数据
+   * @param {object} data - 播放数据
+   */
+  save(data) {
+    const cache = storage.get('PLAYBACK_CACHE') || {}
+    const sessionId = data.sessionId || cache.sessionId || Date.now().toString()
+
+    storage.set('PLAYBACK_CACHE', {
+      ...cache,
+      ...data,
+      sessionId,
+      lastUpdate: new Date().toISOString()
+    })
+  },
+
+  /**
+   * 获取缓存的播放数据
+   * @returns {object|null} 缓存数据
+   */
+  get() {
+    return storage.get('PLAYBACK_CACHE')
+  },
+
+  /**
+   * 清除缓存
+   */
+  clear() {
+    storage.remove('PLAYBACK_CACHE')
+  },
+
+  /**
+   * 同步到历史记录
+   * @returns {boolean} 是否成功同步
+   */
+  syncToHistory() {
+    const cache = this.get()
+    if (!cache || !cache.listenDuration) return false
+
+    const history = storage.get('HISTORY') || []
+    if (history.length === 0) return false
+
+    // 更新最新记录
+    if (!history[0].feedback) {
+      history[0].feedback = {}
+    }
+    history[0].feedback.listenDuration = cache.listenDuration
+    history[0].feedback.musicType = cache.musicType
+    history[0].feedback.lastUpdate = cache.lastUpdate
+
+    storage.set('HISTORY', history)
+    return true
   }
 }
 

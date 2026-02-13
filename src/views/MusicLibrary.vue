@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Play, Pause, Music } from 'lucide-vue-next'
+import { ArrowLeft, Play, Pause, Music, Star, CheckCircle } from 'lucide-vue-next'
 import { CONSTITUTIONS, FIVE_TONES } from '../data/constitutions.js'
+import { storage } from '../utils/storage.js'
 
 const router = useRouter()
 
@@ -10,6 +11,40 @@ const router = useRouter()
 const currentTrack = ref(null)
 const isPlaying = ref(false)
 const audioPlayer = ref(null)
+
+// 用户数据
+const trackRatings = ref({}) // 曲目评价状态
+
+// 加载用户数据
+const loadUserData = () => {
+  // 1. 从历史记录中提取评价数据（来自结果页面）
+  const history = storage.get('HISTORY') || []
+  history.forEach(record => {
+    if (record.feedback?.trackTitle && record.feedback?.rating) {
+      trackRatings.value[record.feedback.trackTitle] = {
+        rating: record.feedback.rating,
+        timestamp: record.feedback.timestamp
+      }
+    }
+  })
+
+  // 2. 从反馈记录中提取评价数据（来自曲库页面）
+  const feedbacks = storage.get('FEEDBACK') || []
+  feedbacks.forEach(feedback => {
+    if (feedback.source === 'library' && feedback.trackTitle && feedback.rating) {
+      trackRatings.value[feedback.trackTitle] = {
+        rating: feedback.rating,
+        timestamp: feedback.timestamp
+      }
+    }
+  })
+
+  console.log('[MusicLibrary] 已加载评价数据:', trackRatings.value)
+}
+
+onMounted(() => {
+  loadUserData()
+})
 
 // 按五音分类音乐
 const musicByTone = computed(() => {
@@ -60,6 +95,20 @@ const playTrack = (track) => {
 
 const onAudioEnded = () => {
   isPlaying.value = false
+  // 保存播放数据
+  console.log('[MusicLibrary] 播放完成:', currentTrack.value?.title)
+}
+
+// 获取曲目评价状态
+const getTrackRating = (trackTitle) => {
+  return trackRatings.value[trackTitle] || null
+}
+
+// 格式化日期
+const formatDate = (timestamp) => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  return `${date.getMonth() + 1}月${date.getDate()}日`
 }
 </script>
 
@@ -103,25 +152,43 @@ const onAudioEnded = () => {
             v-for="track in toneGroup.tracks"
             :key="track.title"
             @click="playTrack(track)"
-            class="w-full card p-4 flex items-center gap-4 text-left transition-all"
+            class="w-full card p-4 flex items-center gap-4 text-left transition-all relative overflow-hidden"
             :class="currentTrack?.title === track.title && isPlaying ? 'ring-2 ring-cinnabar bg-cinnabar/5' : 'hover:bg-white'"
           >
-            <div 
+            <!-- 已评价标记 -->
+            <div v-if="getTrackRating(track.title)" class="absolute top-0 right-0 bg-jade text-white text-[10px] px-2 py-0.5 rounded-bl-lg flex items-center gap-1">
+              <CheckCircle class="w-3 h-3" />
+              已评价
+            </div>
+
+            <div
               class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-md transition-all"
-              :class="currentTrack?.title === track.title && isPlaying 
-                ? 'bg-cinnabar text-white animate-pulse-glow' 
-                : 'bg-ink/5 text-ink'"
+              :class="currentTrack?.title === track.title && isPlaying
+                ? 'bg-cinnabar text-white animate-pulse-glow'
+                : getTrackRating(track.title) ? 'bg-jade text-white' : 'bg-ink/5 text-ink'"
             >
               <Pause v-if="currentTrack?.title === track.title && isPlaying" class="w-5 h-5" />
               <Play v-else class="w-5 h-5 ml-0.5" />
             </div>
-            
+
             <div class="flex-1 min-w-0">
-              <div class="font-medium text-ink truncate">{{ track.title }}</div>
-              <div class="text-xs text-ink-light">适合：{{ track.constitution }}</div>
+              <div class="font-medium text-ink truncate flex items-center gap-2">
+                {{ track.title }}
+                <!-- 评价星级显示 -->
+                <span v-if="getTrackRating(track.title)" class="text-gold text-xs">
+                  {{ '★'.repeat(getTrackRating(track.title).rating) }}
+                </span>
+              </div>
+              <div class="text-xs text-ink-light flex items-center gap-2">
+                <span>适合：{{ track.constitution }}</span>
+                <span v-if="getTrackRating(track.title)" class="text-jade/70">
+                  · {{ formatDate(getTrackRating(track.title).timestamp) }}评价
+                </span>
+              </div>
             </div>
-            
-            <Music class="w-4 h-4 text-ink-light flex-shrink-0" />
+
+            <Music v-if="!getTrackRating(track.title)" class="w-4 h-4 text-ink-light flex-shrink-0" />
+            <Star v-else class="w-4 h-4 text-gold flex-shrink-0" />
           </button>
         </div>
       </section>
@@ -140,7 +207,7 @@ const onAudioEnded = () => {
           <Pause v-if="isPlaying" class="w-5 h-5" />
           <Play v-else class="w-5 h-5 ml-0.5" />
         </button>
-        
+
         <div class="flex-1 min-w-0">
           <div class="font-bold truncate">{{ currentTrack.title }}</div>
           <div class="text-xs opacity-60">传统古曲 · 疗愈</div>
@@ -149,8 +216,8 @@ const onAudioEnded = () => {
     </div>
 
     <!-- 隐藏的音频元素 -->
-    <audio 
-      ref="audioPlayer" 
+    <audio
+      ref="audioPlayer"
       :src="currentTrack?.src"
       @ended="onAudioEnded"
       preload="auto"

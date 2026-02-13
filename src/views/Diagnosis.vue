@@ -72,7 +72,7 @@ const submitManualInput = () => {
 <template>
   <div class="min-h-screen bg-paper pb-20">
     <header class="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-6 py-4 border-b border-ink/5">
-      <h1 class="font-serif font-bold text-xl text-ink">功能与诊断</h1>
+      <h1 class="font-serif font-bold text-xl text-ink">体质测评</h1>
     </header>
 
     <main class="p-6 space-y-6 animate-fade-in-up">

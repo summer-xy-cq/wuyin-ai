@@ -90,6 +90,12 @@ const researchRating = ref({ sleep: 5, anxiety: 5, mood: 5 })
 const researchNote = ref('')
 const researchSubmitted = ref(false)
 
+// === 音乐评价弹窗 ===
+const showFeedbackModal = ref(false)
+const feedbackRating = ref(0)
+const feedbackTrackTitle = ref('')
+const feedbackSource = ref('') // 'library' 或 'rhythm'
+
 const checkResearchStatus = () => {
     const data = storage.get('RESEARCH') || {}
     
@@ -431,6 +437,41 @@ watch(currentTime, (newTime) => {
     }
 })
 
+// 音频播放结束 - 暂时禁用弹窗，等待科研用户主动评价
+const onAudioEnded = () => {
+  isPlaying.value = false
+  // TODO: 科研用户需要主动去"我的"页面进行评价
+  // 暂时不在此处弹窗打扰普通用户
+  console.log('[Home] 音乐播放完成')
+}
+
+// 提交评价
+const submitFeedback = () => {
+  if (!feedbackTrackTitle.value || feedbackRating.value === 0) return
+
+  // 保存到反馈记录
+  const feedbackRecord = {
+    source: feedbackSource.value,
+    trackTitle: feedbackTrackTitle.value,
+    timestamp: new Date().toISOString(),
+    rating: feedbackRating.value
+  }
+
+  const feedbacks = storage.get('FEEDBACK') || []
+  feedbacks.push(feedbackRecord)
+  storage.set('FEEDBACK', feedbacks)
+
+  // 关闭弹窗
+  showFeedbackModal.value = false
+  feedbackRating.value = 0
+}
+
+// 跳过评价
+const skipFeedback = () => {
+  showFeedbackModal.value = false
+  feedbackRating.value = 0
+}
+
 // === 十二时辰养生逻辑 ===
 
 // === 十二时辰养生逻辑 ===
@@ -694,11 +735,11 @@ onUnmounted(() => {
       </section>
 
       <!-- 全局音频播放器（不依赖 currentConstitution） -->
-      <audio 
-        ref="audioPlayer" 
+      <audio
+        ref="audioPlayer"
         :src="currentMusic?.src"
         :loop="isLooping"
-        @ended="isPlaying = false"
+        @ended="onAudioEnded"
         @timeupdate="updateProgress"
         @loadedmetadata="updateProgress"
         preload="auto"
@@ -877,7 +918,7 @@ onUnmounted(() => {
                         <span class="font-bold text-lg">每日科研打卡</span>
                      </div>
                      <p class="text-center text-sm text-ink-light mb-6">今日听音任务已完成，请简单记录感受</p>
-                     
+
                      <div class="space-y-4 mb-6">
                         <div>
                             <div class="flex justify-between text-xs text-ink-light mb-1">
@@ -900,15 +941,15 @@ onUnmounted(() => {
                             </div>
                             <input type="range" min="0" max="10" v-model.number="researchRating.mood" class="w-full h-1.5 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
                         </div>
-                        <input 
+                        <input
                             v-model="researchNote"
                             placeholder="其他感受（选填）"
                             class="w-full p-2 bg-ink/5 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                      </div>
 
-                    <button 
-                        @click="submitResearchLog" 
+                    <button
+                        @click="submitResearchLog"
                         class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
                     >
                         提交打卡
@@ -923,6 +964,43 @@ onUnmounted(() => {
              </div>
         </div>
       </div>
+
+      <!-- 音乐评价弹窗 -->
+      <div v-if="showFeedbackModal" class="fixed inset-0 z-[80] flex items-center justify-center bg-ink/50 backdrop-blur-sm p-4">
+        <div class="bg-paper rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-fade-in-up">
+          <h3 class="font-serif font-bold text-lg text-ink text-center mb-2">疗效反馈</h3>
+
+          <!-- 显示正在评价的曲目 -->
+          <p class="text-xs text-ink-light text-center mb-4">
+            您刚刚听完《{{ feedbackTrackTitle }}》
+          </p>
+
+          <div class="flex justify-center gap-2 mb-4">
+            <button
+              v-for="star in 5"
+              :key="star"
+              @click="feedbackRating = star"
+              class="text-3xl transition-all hover:scale-110"
+              :class="star <= feedbackRating ? 'text-gold' : 'text-ink/20'"
+            >
+              ★
+            </button>
+          </div>
+
+          <!-- 评分提示 -->
+          <p class="text-sm text-cinnabar text-center mb-4 font-medium">
+            {{ feedbackRating === 0 ? '请点击星星评分' : '感谢您的评价！' }}
+          </p>
+
+          <div class="flex gap-3">
+            <button @click="skipFeedback" class="flex-1 py-3 border rounded-xl text-ink-light text-sm">跳过</button>
+            <button @click="submitFeedback" :disabled="feedbackRating === 0" class="flex-1 py-3 bg-cinnabar text-white rounded-xl font-bold" :class="feedbackRating === 0 && 'opacity-50'">
+              提交
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
