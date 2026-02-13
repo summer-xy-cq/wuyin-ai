@@ -17,6 +17,7 @@ import { CONSTITUTIONS } from '../data/constitutions.js'
 import { getFullAssessment } from '../utils/scoring.js'
 import { getAIMusicByConstitution } from '../data/ai-music.js'
 import { storage, playbackCache } from '../utils/storage.js'
+import { toneGenerator, getToneByConstitution, TONE_FREQUENCIES } from '../utils/toneGenerator.js'
 
 const TONE_COLORS = {
   '宫': 'from-amber-500 via-orange-500 to-yellow-600', // Earth - Yellow
@@ -35,6 +36,7 @@ const router = useRouter()
 const loading = ref(true)
 const result = ref(null)
 const isPlaying = ref(false)
+const isAIGenerating = ref(false)  // AI音乐生成状态
 const audioPlayer = ref(null)
 const rating = ref(0)
 const feedbackSubmitted = ref(false)
@@ -127,13 +129,23 @@ const playerBgClass = computed(() => {
 // 当前播放的音乐信息
 const currentMusic = computed(() => {
   if (!result.value) return null
-  
+
   if (musicType.value === 'ai') {
-    return getAIMusicByConstitution(result.value.primary.key)
+    // AI音乐模式：返回虚拟音乐对象（实际用Web Audio API播放）
+    const toneKey = getToneByConstitution(result.value.primary.key)
+    const tone = TONE_FREQUENCIES[toneKey] || TONE_FREQUENCIES.gong
+    return {
+      title: `${tone.name}调养生音`,
+      src: '',  // 空src，用Web Audio API播放
+      duration: '10:00',
+      tone: tone.name,
+      description: tone.description,
+      isAI: true
+    }
   } else {
     // 确保 index 有效
     const tracks = result.value.primary.constitution.tracks || []
-    
+
     // 如果没有 tracks 但有 key，尝试从 CONSTITUTIONS 获取（兼容旧数据）
     let availableTracks = tracks
     if (availableTracks.length === 0 && result.value.primary.key) {
@@ -151,7 +163,7 @@ const currentMusic = computed(() => {
             tone: result.value.primary.constitution.toneName
          }
     }
-    
+
     const track = tracks[currentTrackIndex.value]
     return {
       title: track?.title,
@@ -164,6 +176,11 @@ const currentMusic = computed(() => {
 
 // 切换音乐类型时停止播放并重置进度
 watch(musicType, () => {
+  // 停止AI音乐生成
+  if (isAIGenerating.value) {
+    toneGenerator.stop()
+    isAIGenerating.value = false
+  }
   if (audioPlayer.value) {
     audioPlayer.value.pause()
     isPlaying.value = false
@@ -492,6 +509,25 @@ const calculateResult = () => {
 
 // 播放控制
 const togglePlay = () => {
+  // AI 音乐模式
+  if (musicType.value === 'ai') {
+    if (isPlaying.value) {
+      // 停止AI生成
+      toneGenerator.stop()
+      isPlaying.value = false
+      isAIGenerating.value = false
+    } else {
+      // 开始AI生成
+      const toneKey = getToneByConstitution(result.value?.primary?.key || 'gong')
+      console.log('[Result] 播放AI音乐, toneKey:', toneKey)
+      toneGenerator.playPentatonic(toneKey, 600)  // 播放10分钟
+      isPlaying.value = true
+      isAIGenerating.value = true
+    }
+    return
+  }
+
+  // 传统音乐模式
   if (!audioPlayer.value) return
 
   if (isPlaying.value) {

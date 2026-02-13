@@ -5,10 +5,12 @@ import { Music, BookOpen, Sparkles, ChevronRight, Play, Pause, CheckCircle2, Clo
 import { getAIMusicByConstitution } from '../data/ai-music.js'
 import { CONSTITUTIONS } from '../data/constitutions.js'
 import { storage } from '../utils/storage.js'
+import { toneGenerator, getToneByConstitution, TONE_FREQUENCIES } from '../utils/toneGenerator.js'
 
 const router = useRouter()
 const currentConstitution = ref(null)
 const isPlaying = ref(false)
+const isAIGenerating = ref(false)  // AI音乐生成状态
 const audioPlayer = ref(null)
 const musicType = ref('traditional')
 
@@ -284,18 +286,23 @@ const currentMusic = computed(() => {
 
   const c = currentConstitution.value
   if (!c) return null
-  
+
   if (musicType.value === 'ai') {
-    if (c.aiMusic && c.aiMusic.src && c.aiMusic.title) return c.aiMusic
-    if (c.constitutionKey || c.key) {
-       return getAIMusicByConstitution(c.constitutionKey || c.key)
+    // AI音乐模式：返回虚拟音乐对象（实际用Web Audio API播放）
+    const toneKey = getToneByConstitution(c.constitutionKey || c.key || 'gong')
+    const tone = TONE_FREQUENCIES[toneKey] || TONE_FREQUENCIES.gong
+    return {
+      title: `${tone.name}调养生音`,
+      src: '',  // 空src，用Web Audio API播放
+      duration: '10:00',
+      tone: tone.name,
+      isAI: true
     }
-    return { title: 'AI生成旋律', src: '', duration: '0:00' }
   } else {
     // UPDATED: Support multiple tracks selection
     // Ensure we have tracks array
     let tracks = c.tracks || []
-    
+
     // If tracks missing in history but we have key, try to fetch from CONSTITUTIONS (fallback for old data)
     if (tracks.length === 0 && (c.constitutionKey || c.key)) {
         const key = c.constitutionKey || c.key
@@ -309,7 +316,7 @@ const currentMusic = computed(() => {
         if (currentTrackIndex.value >= tracks.length) currentTrackIndex.value = 0
         return tracks[currentTrackIndex.value]
     }
-    
+
     // Fallback if no tracks
     if (c.traditionalMusic && c.traditionalMusic.src && c.traditionalMusic.title) return c.traditionalMusic
     return { title: '传统古曲', src: '', duration: '0:00' }
@@ -342,12 +349,17 @@ const selectTrack = (index) => {
 
 // Reset index when switching types
 watch(musicType, () => {
+  // 停止AI生成
+  if (isAIGenerating.value) {
+    toneGenerator.stop()
+    isAIGenerating.value = false
+  }
   if (audioPlayer.value) {
     audioPlayer.value.pause()
     isPlaying.value = false
     currentTime.value = 0
   }
-  currentTrackIndex.value = 0 
+  currentTrackIndex.value = 0
 })
 
 // === VIP & 试听逻辑 ===
@@ -411,6 +423,12 @@ const toggleVipStatus = () => {
 }
 
 const playRhythmTrack = () => {
+    // 停止AI音乐生成
+    if (isAIGenerating.value) {
+        toneGenerator.stop()
+        isAIGenerating.value = false
+    }
+
     // 如果正在播放时辰音乐，再次点击为暂停/恢复
     if (playingRhythm.value && isPlaying.value) {
         audioPlayer.value.pause()
@@ -459,10 +477,29 @@ const playRhythmTrack = () => {
     })
 }
 
-// Override togglePlay to handle VIP check
+// Override togglePlay to handle VIP check and AI generation
 const togglePlay = () => {
+  // AI 音乐模式
+  if (musicType.value === 'ai') {
+    if (isPlaying.value) {
+      // 停止AI生成
+      toneGenerator.stop()
+      isPlaying.value = false
+      isAIGenerating.value = false
+    } else {
+      // 开始AI生成
+      const toneKey = getToneByConstitution(currentConstitution.value?.constitutionKey || currentConstitution.value?.key || 'gong')
+      console.log('[Home] 播放AI音乐, toneKey:', toneKey)
+      toneGenerator.playPentatonic(toneKey, 600)  // 播放10分钟
+      isPlaying.value = true
+      isAIGenerating.value = true
+    }
+    return
+  }
+
+  // 传统音乐模式
   if (!audioPlayer.value) return
-  
+
   if (isPlaying.value) {
     audioPlayer.value.pause()
     isPlaying.value = false
@@ -639,6 +676,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (rhythmTimer) clearInterval(rhythmTimer)
+  // 停止AI音乐生成
+  if (isAIGenerating.value) {
+    toneGenerator.stop()
+  }
 })
 </script>
 
