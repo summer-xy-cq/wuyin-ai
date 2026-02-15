@@ -56,34 +56,43 @@ class ToneGenerator {
     this.audioContext = null
     this.masterGain = null
     this.isPlaying = false
+    this.isPaused = false
     this.oscillators = []
     this.currentTone = null
     this.noteInterval = null
+    this.currentOsc = null       // 当前正在播放的振荡器
+    this.currentScale = 'gong'   // 当前音阶
+    this.totalDuration = 0       // 总时长（秒）
+    this.noteIndex = 0           // 当前音符索引
   }
 
   // 初始化音频上下文
   init() {
     if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
       this.masterGain = this.audioContext.createGain()
+      this.masterGain.gain.value = 0.3  // 降低音量
       this.masterGain.connect(this.audioContext.destination)
-      this.masterGain.gain.value = 0.3
     }
     return this.audioContext
   }
 
-  // 生成柔和的正弦波音色
+  // 生成柔和的正弦波音色（带泛音）
   createOscillator(frequency, type = 'sine') {
-    const osc = this.audioContext.createOscillator()
-    const gain = this.audioContext.createGain()
+    const ctx = this.audioContext
+
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
 
     osc.type = type
-    osc.frequency.setValueAtTime(frequency, this.audioContext.currentTime)
+    osc.frequency.setValueAtTime(frequency, ctx.currentTime)
 
-    gain.gain.setValueAtTime(0, this.audioContext.currentTime)
-    gain.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.5)
-    gain.gain.linearRampToValueAtTime(0.2, this.audioContext.currentTime + 1)
-    gain.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 3)
+    // 柔和的淡入淡出包络
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.8)  // 慢速淡入
+    gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 2)
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 4)  // 4秒后淡出
 
     osc.connect(gain)
     gain.connect(this.masterGain)
@@ -91,7 +100,17 @@ class ToneGenerator {
     return { osc, gain }
   }
 
-  // 播放五声音阶（宫商角徵羽）
+  // 随机打乱数组
+  shuffleArray(array) {
+    const arr = [...array]
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr
+  }
+
+  // 播放五声音阶（宫商角徵羽）- 优雅随机版本
   playPentatonic(scale = 'gong', duration = 120) {
     const scaleNotes = {
       gong: [261.63, 293.66, 329.63, 392.00, 440.00],
@@ -102,39 +121,68 @@ class ToneGenerator {
     }
 
     const notes = scaleNotes[scale] || scaleNotes.gong
+    const shuffledNotes = this.shuffleArray(notes)
+
+    // 生成八度音
+    const highOctave = notes.map(f => f * 2)
+    const lowOctave = notes.map(f => f / 2)
 
     this.init()
     this.stop()
 
     this.isPlaying = true
-    let noteIndex = 0
+    this.isPaused = false
+    this.currentScale = scale
+    this.totalDuration = duration
+    this.noteIndex = 0
 
     const playNote = () => {
-      if (!this.isPlaying || noteIndex >= notes.length * 10) {
+      if (!this.isPlaying || this.noteIndex >= notes.length * 10) {
         this.stop()
         return
       }
 
-      const freq = notes[noteIndex % notes.length]
-      const { osc, gain } = this.createOscillator(freq, 'sine')
+      // 随机选择音符（保持简单：主要是原音阶，偶尔高/低八度）
+      const noteSource = Math.random()
+      let freq
+
+      if (noteSource < 0.5) {
+        // 50% 原音阶顺序
+        freq = notes[this.noteIndex % notes.length]
+      } else if (noteSource < 0.7) {
+        // 20% 打乱顺序
+        freq = shuffledNotes[this.noteIndex % shuffledNotes.length]
+      } else if (noteSource < 0.85) {
+        // 15% 高八度
+        freq = highOctave[this.noteIndex % highOctave.length]
+      } else {
+        // 15% 低八度
+        freq = lowOctave[this.noteIndex % lowOctave.length]
+      }
+
+      // 微调频率（-2到+2Hz），让音色更自然
+      freq = freq + (Math.random() * 4 - 2)
+
+      // 主要使用正弦波，偶尔用三角波
+      const waveType = Math.random() < 0.15 ? 'triangle' : 'sine'
+
+      const { osc, gain } = this.createOscillator(freq, waveType)
       osc.start()
 
-      setTimeout(() => {
-        gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.5)
-        setTimeout(() => {
-          try { osc.stop() } catch(e) {}
-        }, 500)
-      }, 3500)
+      this.currentOsc = { osc, gain }
 
-      noteIndex++
-      this.noteInterval = setTimeout(playNote, 4000)
+      this.noteIndex++
+
+      // 间隔时间（4-6秒），让每个音符有充足的时间播放完
+      const interval = 4000 + Math.random() * 2000
+      this.noteInterval = setTimeout(playNote, interval)
     }
 
     playNote()
 
     // 定时停止
     setTimeout(() => {
-      if (this.isPlaying) {
+      if (this.isPlaying && !this.isPaused) {
         this.stop()
       }
     }, duration * 1000)
@@ -142,8 +190,108 @@ class ToneGenerator {
     return TONE_FREQUENCIES[scale] || TONE_FREQUENCIES.gong
   }
 
-  // 停止播放
-  stop() {
+  // 自定义参数播放五声音阶
+  playPentatonicWithOptions(scale = 'gong', duration = 120, options = {}) {
+    const { rhythm = 'natural', variation = 'rich' } = options
+
+    // 节奏参数
+    const rhythmConfig = {
+      slow: { interval: 6000, noteDuration: 4500 },      // 舒缓：6秒间隔
+      natural: { interval: 4500, noteDuration: 3500 },   // 自然：4.5秒间隔
+      active: { interval: 3000, noteDuration: 2500 }     // 活跃：3秒间隔
+    }
+
+    const config = rhythmConfig[rhythm] || rhythmConfig.natural
+
+    const scaleNotes = {
+      gong: [261.63, 293.66, 329.63, 392.00, 440.00],
+      shang: [293.66, 329.63, 392.00, 440.00, 523.25],
+      jiao: [329.63, 392.00, 440.00, 523.25, 587.33],
+      zhi: [392.00, 440.00, 523.25, 587.33, 659.25],
+      yu: [440.00, 523.25, 587.33, 659.25, 783.99]
+    }
+
+    const notes = scaleNotes[scale] || scaleNotes.gong
+    const shuffledNotes = this.shuffleArray(notes)
+    const highOctave = notes.map(f => f * 2)
+    const lowOctave = notes.map(f => f / 2)
+
+    this.init()
+    this.stop()
+
+    this.isPlaying = true
+    this.isPaused = false
+    this.currentScale = scale
+    this.totalDuration = duration
+    this.noteIndex = 0
+
+    // 根据变化程度调整随机概率
+    const variationConfig = {
+      simple: { shuffle: 0.1, high: 0.05, low: 0.05 },   // 简洁：很少变化
+      rich: { shuffle: 0.3, high: 0.2, low: 0.2 },      // 丰富：中等变化
+      random: { shuffle: 0.5, high: 0.3, low: 0.3 }     // 随机：很多变化
+    }
+
+    const varCfg = variationConfig[variation] || variationConfig.rich
+
+    const playNote = () => {
+      if (!this.isPlaying || this.noteIndex >= notes.length * 10) {
+        this.stop()
+        return
+      }
+
+      const noteSource = Math.random()
+      let freq
+
+      if (noteSource < 0.5) {
+        // 50% 原音阶顺序
+        freq = notes[this.noteIndex % notes.length]
+      } else if (noteSource < 0.5 + varCfg.shuffle) {
+        // 根据变化程度
+        freq = shuffledNotes[this.noteIndex % shuffledNotes.length]
+      } else if (noteSource < 0.5 + varCfg.shuffle + varCfg.high) {
+        freq = highOctave[this.noteIndex % highOctave.length]
+      } else if (noteSource < 0.5 + varCfg.shuffle + varCfg.high + varCfg.low) {
+        freq = lowOctave[this.noteIndex % lowOctave.length]
+      } else {
+        freq = notes[this.noteIndex % notes.length]
+      }
+
+      // 微调频率
+      freq = freq + (Math.random() * 4 - 2)
+
+      // 波形选择
+      const waveType = Math.random() < 0.15 ? 'triangle' : 'sine'
+
+      const { osc, gain } = this.createOscillator(freq, waveType)
+      osc.start()
+
+      this.currentOsc = { osc, gain }
+
+      this.noteIndex++
+
+      // 根据节奏调整间隔
+      const intervalVariation = config.interval + (Math.random() * 1000 - 500)
+      this.noteInterval = setTimeout(playNote, intervalVariation)
+    }
+
+    playNote()
+
+    // 定时停止
+    setTimeout(() => {
+      if (this.isPlaying && !this.isPaused) {
+        this.stop()
+      }
+    }, duration * 1000)
+
+    return TONE_FREQUENCIES[scale] || TONE_FREQUENCIES.gong
+  }
+
+  // 暂停播放
+  pause() {
+    if (!this.isPlaying || this.isPaused) return
+
+    this.isPaused = true
     this.isPlaying = false
 
     if (this.noteInterval) {
@@ -151,12 +299,107 @@ class ToneGenerator {
       this.noteInterval = null
     }
 
-    this.oscillators.forEach(({ osc, gain }) => {
+    if (this.currentOsc) {
+      const { osc, gain } = this.currentOsc
       try {
-        gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.1)
+        gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.5)
         setTimeout(() => {
           try { osc.stop() } catch(e) {}
-        }, 150)
+        }, 550)
+      } catch(e) {}
+      this.currentOsc = null
+    }
+  }
+
+  // 恢复播放
+  resume() {
+    if (!this.isPaused || this.isPlaying) return
+
+    this.isPaused = false
+    this.isPlaying = true
+
+    const scaleNotes = {
+      gong: [261.63, 293.66, 329.63, 392.00, 440.00],
+      shang: [293.66, 329.63, 392.00, 440.00, 523.25],
+      jiao: [329.63, 392.00, 440.00, 523.25, 587.33],
+      zhi: [392.00, 440.00, 523.25, 587.33, 659.25],
+      yu: [440.00, 523.25, 587.33, 659.25, 783.99]
+    }
+
+    const notes = scaleNotes[this.currentScale] || scaleNotes.gong
+    const shuffledNotes = this.shuffleArray(notes)
+
+    const playNote = () => {
+      if (!this.isPlaying || this.noteIndex >= notes.length * 10) {
+        this.stop()
+        return
+      }
+
+      const noteSource = Math.random()
+      let freq
+
+      if (noteSource < 0.5) {
+        freq = notes[this.noteIndex % notes.length]
+      } else if (noteSource < 0.7) {
+        freq = shuffledNotes[this.noteIndex % shuffledNotes.length]
+      } else if (noteSource < 0.85) {
+        freq = notes[this.noteIndex % notes.length] * 2
+      } else {
+        freq = notes[this.noteIndex % notes.length] / 2
+      }
+
+      freq = freq + (Math.random() * 4 - 2)
+
+      const waveType = Math.random() < 0.15 ? 'triangle' : 'sine'
+
+      const { osc, gain } = this.createOscillator(freq, waveType)
+      osc.start()
+      this.currentOsc = { osc, gain }
+
+      this.noteIndex++
+      const interval = 4000 + Math.random() * 2000
+      this.noteInterval = setTimeout(playNote, interval)
+    }
+
+    playNote()
+
+    const remainingTime = (this.totalDuration * 1000) - (this.noteIndex * 5000)
+    if (remainingTime > 0) {
+      setTimeout(() => {
+        if (this.isPlaying && !this.isPaused) {
+          this.stop()
+        }
+      }, remainingTime)
+    }
+  }
+
+  // 停止播放
+  stop() {
+    this.isPlaying = false
+    this.isPaused = false
+
+    if (this.noteInterval) {
+      clearTimeout(this.noteInterval)
+      this.noteInterval = null
+    }
+
+    if (this.currentOsc) {
+      const { osc, gain } = this.currentOsc
+      try {
+        gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.2)
+        setTimeout(() => {
+          try { osc.stop() } catch(e) {}
+        }, 250)
+      } catch(e) {}
+      this.currentOsc = null
+    }
+
+    this.oscillators.forEach(({ osc, gain }) => {
+      try {
+        gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.2)
+        setTimeout(() => {
+          try { osc.stop() } catch(e) {}
+        }, 250)
       } catch(e) {}
     })
 
