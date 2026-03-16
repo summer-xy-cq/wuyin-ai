@@ -481,7 +481,7 @@ const certificateDate = computed(() => {
 <template>
   <div class="min-h-screen bg-paper pb-10">
     <!-- Header -->
-    <header class="sticky top-0 z-50 bg-paper/90 backdrop-blur border-b border-ink/5 px-6 py-4 flex items-center justify-between">
+    <header class="sticky top-0 z-50 bg-paper/90 backdrop-blur border-b border-ink/5 px-6 py-4 flex items-center justify-between max-w-lg mx-auto w-full">
       <div class="flex items-center gap-3">
         <button @click="router.back()" class="p-1 -ml-2 rounded-full hover:bg-ink/5">
           <ArrowLeft class="w-6 h-6 text-ink" />
@@ -490,7 +490,7 @@ const certificateDate = computed(() => {
       </div>
     </header>
 
-    <main class="p-6">
+    <main class="p-6 max-w-lg mx-auto">
       <!-- 1. 介绍页 -->
       <div v-if="step === 'intro'" class="animate-fade-in-up">
         <div class="text-center mb-8 mt-4">

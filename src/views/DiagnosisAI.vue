@@ -141,13 +141,13 @@ const exit = () => {
   <div class="min-h-screen bg-paper pb-10">
     <!-- Intro Screen -->
     <div v-if="step === 'intro'" class="min-h-screen flex flex-col">
-        <header class="p-4">
+        <header class="p-4 max-w-lg mx-auto w-full">
             <button @click="router.back()" class="text-ink-light hover:text-ink">
                 <ArrowLeft class="w-6 h-6" />
             </button>
         </header>
-        
-        <main class="flex-1 px-8 flex flex-col justify-center items-center text-center -mt-10 animate-fade-in-up">
+
+        <main class="flex-1 px-8 flex flex-col justify-center items-center text-center -mt-10 animate-fade-in-up max-w-lg mx-auto w-full">
             <div class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-xl mb-8 transform rotate-3">
                 <BrainCircuit class="w-12 h-12 text-white" />
             </div>
@@ -222,8 +222,8 @@ const exit = () => {
     </div>
 
     <!-- Result Display (Mock) -->
-    <div v-if="step === 'result'" class="min-h-screen p-6 animate-fade-in-up">
-        <header class="flex items-center justify-between mb-8">
+    <div v-if="step === 'result'" class="min-h-screen p-6 animate-fade-in-up max-w-lg mx-auto">
+        <header class="flex items-center justify-between mb-8 max-w-lg mx-auto">
             <h1 class="text-2xl font-serif font-bold text-ink">分析报告</h1>
             <button @click="exit" class="text-sm text-ink-light hover:text-ink">完成</button>
         </header>

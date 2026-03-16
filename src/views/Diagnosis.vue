@@ -71,11 +71,11 @@ const submitManualInput = () => {
 
 <template>
   <div class="min-h-screen bg-paper pb-20">
-    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-6 py-4 border-b border-ink/5">
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-6 py-4 border-b border-ink/5 max-w-lg mx-auto w-full">
       <h1 class="font-serif font-bold text-xl text-ink">体质测评</h1>
     </header>
 
-    <main class="p-6 space-y-6 animate-fade-in-up">
+    <main class="p-6 space-y-6 animate-fade-in-up max-w-lg mx-auto">
       <!-- VIP 状态卡片 -->
       <div class="card p-4 bg-gradient-to-r from-gold/10 to-gold-light/10 border border-gold/20 flex items-center justify-between">
         <div class="flex items-center gap-3">
