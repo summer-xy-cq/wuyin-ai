@@ -77,7 +77,7 @@ const allAnswered = computed(() => {
 <template>
   <div class="min-h-screen bg-paper flex flex-col">
     <!-- 头部导航 -->
-    <header class="sticky top-0 z-50 bg-paper/80 backdrop-blur-lg border-b border-ink/5">
+    <header class="sticky top-0 z-50 bg-paper/80 backdrop-blur-lg border-b border-ink/5 max-w-lg mx-auto w-full">
       <div class="max-w-lg mx-auto px-6 py-4">
         <div class="flex items-center justify-between mb-3">
           <button @click="router.push('/')" class="p-2 -ml-2 rounded-full hover:bg-ink/5 transition-colors">
