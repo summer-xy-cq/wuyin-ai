@@ -479,17 +479,25 @@ const chartData = computed(() => {
   let chartValues = []
   const constitutionKeys = Object.keys(CONSTITUTIONS)
 
-  // 检查是否是手动输入（没有真实的scores数据）
-  const hasRealScores = result.value.scores?.transformed && Object.keys(result.value.scores.transformed).length > 0
+  // 检查是否有真实的scores数据
+  const scores = result.value.scores
+  const transformed = scores?.transformed
+
+  // 判断是否有真实数据：transformed存在且至少有一个非0值
+  const hasRealScores = transformed && Object.keys(transformed).length > 0 &&
+    Object.values(transformed).some(v => v > 0)
 
   if (hasRealScores) {
     // 真实测评：使用转换后的分数
-    chartValues = constitutionKeys.map(k => result.value.scores.transformed[k] || 0)
+    chartValues = constitutionKeys.map(k => transformed[k] || 0)
   } else {
-    // 手动选择体质：生成虚拟数据（选择的体质分数较高，其他较低）
+    // 手动选择体质或无数据：生成虚拟数据（选择的体质分数较高，其他较低）
     const selectedKey = result.value.primary?.key
     chartValues = constitutionKeys.map(k => k === selectedKey ? 80 : 30)
   }
+
+  console.log('[Chart] chartValues:', chartValues)
+  console.log('[Chart] hasRealScores:', hasRealScores)
 
   return {
     labels: Object.values(CONSTITUTIONS).map(c => c.name),
