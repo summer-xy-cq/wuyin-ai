@@ -9,7 +9,8 @@ import {
   LineElement,
   Filler,
   Tooltip,
-  Legend
+  Legend,
+  RadarController
 } from 'chart.js'
 import { Chart } from 'vue-chartjs'
 import { QUESTIONS_FREE } from '../data/questions-free.js'
@@ -28,7 +29,7 @@ const TONE_COLORS = {
 }
 
 // 注册 Chart.js
-ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend, RadarController)
 
 const router = useRouter()
 
