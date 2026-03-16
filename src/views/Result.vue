@@ -46,6 +46,10 @@ const currentTime = ref(0)
 const duration = ref(0)
 const showVipModal = ref(false)
 
+// 折叠/展开状态
+const isRadarExpanded = ref(false)  // 雷达图展开状态
+const isTendencyExpanded = ref(false)  // 兼夹体质展开状态
+
 const isLooping = ref(false)
 const currentTrackIndex = ref(0)
 
@@ -470,6 +474,23 @@ const chartData = computed(() => {
   if (!result.value) return { labels: [], datasets: [] }
 
   console.log('[Chart] scores:', result.value.scores)
+
+  // 生成雷达图数据
+  let chartValues = []
+  const constitutionKeys = Object.keys(CONSTITUTIONS)
+
+  // 检查是否是手动输入（没有真实的scores数据）
+  const hasRealScores = result.value.scores?.transformed && Object.keys(result.value.scores.transformed).length > 0
+
+  if (hasRealScores) {
+    // 真实测评：使用转换后的分数
+    chartValues = constitutionKeys.map(k => result.value.scores.transformed[k] || 0)
+  } else {
+    // 手动选择体质：生成虚拟数据（选择的体质分数较高，其他较低）
+    const selectedKey = result.value.primary?.key
+    chartValues = constitutionKeys.map(k => k === selectedKey ? 80 : 30)
+  }
+
   return {
     labels: Object.values(CONSTITUTIONS).map(c => c.name),
     datasets: [{
@@ -481,7 +502,7 @@ const chartData = computed(() => {
       pointBorderColor: '#fff',
       pointHoverBackgroundColor: '#fff',
       pointHoverBorderColor: '#A63434',
-      data: Object.keys(CONSTITUTIONS).map(k => result.value.scores.transformed[k] || 0)
+      data: chartValues
     }]
   }
 })
@@ -1027,77 +1048,103 @@ const skipFeedback = () => {
 
       <main class="max-w-lg mx-auto px-6 py-6 space-y-6">
         <!-- 主要体质卡片 -->
-        <section class="card p-6 border-t-4 animate-fade-in-up" :style="{ borderColor: result.primary.constitution.color }">
+        <section class="card p-4 border-t-4 animate-fade-in-up" :style="{ borderColor: result.primary.constitution.color }">
           <div class="text-xs text-ink-light tracking-widest uppercase mb-2">您的主要体质</div>
           <h2 class="text-3xl font-serif font-bold text-ink mb-3">{{ result.primary.constitution.name }}</h2>
           <p class="text-ink-light leading-relaxed mb-4">
             {{ result.primary.constitution.desc }}
           </p>
-          <div class="bg-jade/10 rounded-lg p-4">
+          <div class="bg-jade/10 rounded-lg p-3">
             <p class="text-sm text-jade font-medium">{{ result.primary.constitution.feature }}</p>
           </div>
         </section>
 
-        <!-- 雷达图 (VIP) -->
-        <section class="card p-6 animate-fade-in-up" style="animation-delay: 0.1s">
-          <h3 class="font-serif font-bold text-lg text-ink mb-4 text-center">体质全景分析</h3>
-          <div class="h-80 w-full relative">
-            <Chart v-if="chartData.datasets && chartData.datasets.length > 0" type="radar" :data="chartData" :options="chartOptions" />
-            
-            <!-- VIP 锁 -->
-            <div v-if="!isVip" class="absolute inset-0 flex flex-col items-center justify-center z-10">
-              <div class="w-12 h-12 rounded-full bg-ink/80 flex items-center justify-center mb-2 shadow-lg">
-                <Lock class="w-6 h-6 text-gold" />
-              </div>
-              <p class="font-serif font-bold text-ink">升级 VIP 解锁全景分析</p>
+        <!-- 雷达图 (VIP) - 可折叠 -->
+        <section class="card p-4 animate-fade-in-up" style="animation-delay: 0.1s">
+          <!-- 折叠标题栏 -->
+          <div class="flex items-center justify-between cursor-pointer" @click="isRadarExpanded = !isRadarExpanded">
+            <div class="flex items-center gap-2">
+              <h3 class="font-serif font-bold text-lg text-ink">体质全景分析</h3>
+              <span v-if="!isRadarExpanded" class="text-xs text-ink-light bg-ink/5 px-2 py-0.5 rounded">点击展开</span>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-ink/5 flex items-center justify-center transition-transform" :class="isRadarExpanded && 'rotate-180'">
+              <svg class="w-4 h-4 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
           </div>
-          <p class="text-xs text-center text-ink-light mt-4">
-            {{ isVip ? '越向外扩张，说明该体质特征越明显' : '深度解析九种体质分布，精准定位偏颇' }}
-          </p>
+
+          <!-- 折叠内容 -->
+          <div v-show="isRadarExpanded" class="mt-4">
+            <div class="h-72 w-full relative">
+              <Chart v-if="chartData.datasets && chartData.datasets.length > 0" type="radar" :data="chartData" :options="chartOptions" />
+
+              <!-- VIP 锁 -->
+              <div v-if="!isVip" class="absolute inset-0 flex flex-col items-center justify-center z-10">
+                <div class="w-12 h-12 rounded-full bg-ink/80 flex items-center justify-center mb-2 shadow-lg">
+                  <Lock class="w-6 h-6 text-gold" />
+                </div>
+                <p class="font-serif font-bold text-ink">升级 VIP 解锁全景分析</p>
+              </div>
+            </div>
+            <p class="text-xs text-center text-ink-light mt-2">
+              {{ isVip ? '越向外扩张，说明该体质特征越明显' : '深度解析九种体质分布，精准定位偏颇' }}
+            </p>
+          </div>
         </section>
 
-        <!-- 兼夹体质 (VIP) -->
-        <section v-if="result.tendencies && result.tendencies.length > 0" class="card p-6 border-l-4 border-gold animate-fade-in-up" style="animation-delay: 0.15s">
-          <h3 class="font-serif font-bold text-lg text-ink mb-3">兼夹体质</h3>
-          
-          <div v-if="!isVip">
-            <p class="text-sm text-ink-light mb-4">
-              检测到您有复杂的混合体质倾向，可能影响调理方案的精准度。
-            </p>
-            <button class="w-full py-3 bg-gradient-to-r from-gold to-gold-light text-ink-dark font-bold rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
-              <Crown class="w-4 h-4" />
-              升级 VIP 查看深度兼夹分析
-            </button>
+        <!-- 兼夹体质 (VIP) - 可折叠 -->
+        <section v-if="result.tendencies && result.tendencies.length > 0" class="card p-4 border-l-4 border-gold animate-fade-in-up" style="animation-delay: 0.15s">
+          <!-- 折叠标题栏 -->
+          <div class="flex items-center justify-between cursor-pointer" @click="isTendencyExpanded = !isTendencyExpanded">
+            <div class="flex items-center gap-2">
+              <h3 class="font-serif font-bold text-lg text-ink">兼夹体质</h3>
+              <span class="text-xs text-gold bg-gold/10 px-2 py-0.5 rounded">{{ result.tendencies.length }}种倾向</span>
+              <span v-if="!isTendencyExpanded" class="text-xs text-ink-light bg-ink/5 px-2 py-0.5 rounded">点击展开</span>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-ink/5 flex items-center justify-center transition-transform" :class="isTendencyExpanded && 'rotate-180'">
+              <svg class="w-4 h-4 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
           </div>
 
-          <div v-else>
-            <p class="text-sm text-ink-light mb-4 leading-relaxed">
-              中医体质常为混合存在。数据显示您兼有以下体质倾向，调理时需兼顾整体平衡。
-            </p>
-            <div class="space-y-3">
-              <div 
-                v-for="item in result.tendencies" 
-                :key="item.key"
-                class="flex items-center justify-between p-3 bg-ink/5 rounded-lg"
-              >
-                <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center font-serif font-bold text-ink shadow-sm">
-                    {{ item.constitution.name[0] }}
+          <!-- 折叠内容 -->
+          <div v-show="isTendencyExpanded" class="mt-4">
+            <div v-if="!isVip">
+              <p class="text-sm text-ink-light mb-4">
+                检测到您有复杂的混合体质倾向，可能影响调理方案的精准度。
+              </p>
+              <button class="w-full py-3 bg-gradient-to-r from-gold to-gold-light text-ink-dark font-bold rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
+                <Crown class="w-4 h-4" />
+                升级 VIP 查看深度兼夹分析
+              </button>
+            </div>
+
+            <div v-else>
+              <p class="text-sm text-ink-light mb-4 leading-relaxed">
+                中医体质常为混合存在。数据显示您兼有以下体质倾向，调理时需兼顾整体平衡。
+              </p>
+              <div class="space-y-3">
+                <div
+                  v-for="item in result.tendencies"
+                  :key="item.key"
+                  class="flex items-center justify-between p-3 bg-ink/5 rounded-lg"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center font-serif font-bold text-ink shadow-sm">
+                      {{ item.constitution.name[0] }}
+                    </div>
+                    <div>
+                      <div class="font-medium text-ink">{{ item.constitution.name }}</div>
+                      <div class="text-xs text-ink-light">转化分: {{ item.score }}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div class="font-medium text-ink">{{ item.constitution.name }}</div>
-                    <div class="text-xs text-ink-light">转化分: {{ item.score }}</div>
+                  <div class="text-sm font-bold text-ink-light/70 bg-white/50 px-2 py-1 rounded">
+                    {{ item.judgment.label }}
                   </div>
-                </div>
-                <div class="text-sm font-bold text-ink-light/70 bg-white/50 px-2 py-1 rounded">
-                  {{ item.judgment.label }}
                 </div>
               </div>
+              <p class="text-[10px] text-ink-light/50 mt-4 text-center">
+                * 本处方优先针对您的主体质（{{ result.primary.constitution.name }}）进行核心调理
+              </p>
             </div>
-            <p class="text-[10px] text-ink-light/50 mt-4 text-center">
-              * 本处方优先针对您的主体质（{{ result.primary.constitution.name }}）进行核心调理
-            </p>
           </div>
         </section>
 
@@ -1312,10 +1359,10 @@ const skipFeedback = () => {
         </section>
 
         <!-- 养生建议 -->
-        <section class="card p-6 animate-fade-in-up" style="animation-delay: 0.3s">
-          <h3 class="font-serif font-bold text-lg text-ink mb-4">养生调理建议</h3>
+        <section class="card p-4 animate-fade-in-up" style="animation-delay: 0.3s">
+          <h3 class="font-serif font-bold text-lg text-ink mb-3">养生调理建议</h3>
           
-          <div class="space-y-4">
+          <div class="space-y-3">
             <div class="flex gap-3">
               <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-cinnabar/10 flex items-center justify-center text-cinnabar font-bold text-sm">食</div>
               <div>
@@ -1323,7 +1370,7 @@ const skipFeedback = () => {
                 <p class="text-ink-light text-sm">{{ result.primary.constitution.advice.diet }}</p>
               </div>
             </div>
-            
+
             <div class="flex gap-3">
               <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-jade/10 flex items-center justify-center text-jade font-bold text-sm">居</div>
               <div>
@@ -1331,7 +1378,7 @@ const skipFeedback = () => {
                 <p class="text-ink-light text-sm">{{ result.primary.constitution.advice.living }}</p>
               </div>
             </div>
-            
+
             <div class="flex gap-3">
               <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center text-gold font-bold text-sm">动</div>
               <div>
