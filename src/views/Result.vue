@@ -47,8 +47,8 @@ const duration = ref(0)
 const showVipModal = ref(false)
 
 // 折叠/展开状态
-const isRadarExpanded = ref(false)  // 雷达图展开状态
-const isTendencyExpanded = ref(false)  // 兼夹体质展开状态
+const isRadarExpanded = ref(true)  // 雷达图展开状态
+const isTendencyExpanded = ref(true)  // 兼夹体质展开状态
 
 const isLooping = ref(false)
 const currentTrackIndex = ref(0)
@@ -1083,7 +1083,7 @@ const skipFeedback = () => {
           <!-- 折叠内容 -->
           <div v-show="isRadarExpanded" class="mt-4">
             <div class="h-72 w-full relative">
-              <Chart v-if="chartData.datasets && chartData.datasets.length > 0" type="radar" :data="chartData" :options="chartOptions" />
+              <Chart v-if="chartData.labels && chartData.labels.length > 0" type="radar" :data="chartData" :options="chartOptions" />
 
               <!-- VIP 锁 -->
               <div v-if="!isVip" class="absolute inset-0 flex flex-col items-center justify-center z-10">
