@@ -151,14 +151,14 @@ const updateRating = (index, rating) => {
 
 <template>
   <div class="min-h-screen bg-paper pb-20">
-    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-6 py-4 border-b border-ink/5 flex justify-between items-center">
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-10 px-6 py-4 border-b border-ink/5 flex justify-between items-center max-w-lg mx-auto">
       <h1 class="font-serif font-bold text-xl text-ink">个人中心</h1>
       <button class="p-2 -mr-2 text-ink-light hover:text-ink hover:bg-ink/5 rounded-full transition-colors">
         <Settings class="w-5 h-5" />
       </button>
     </header>
 
-    <main class="p-6 space-y-6 animate-fade-in-up">
+    <main class="p-6 space-y-6 animate-fade-in-up max-w-lg mx-auto">
       <!-- 用户信息卡片 -->
       <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-full bg-ink/10 flex items-center justify-center text-ink-light">
