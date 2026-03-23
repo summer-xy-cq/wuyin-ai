@@ -1,75 +1,60 @@
-import { GoogleGenerativeAI } from '@google-generative-ai';
+/**
+ * 望诊分析 API - 使用硅基流动 Qwen VL 模型
+ *
+ * 切换说明：
+ * - 原 Google Gemini → 现用 SiliconFlow Qwen2.5-VL-72B-Instruct
+ * - base_url: https://api.siliconflow.cn/v1
+ * - 模型: Qwen/Qwen2.5-VL-72B-Instruct (支持多图输入)
+ */
 
-// This function will run on Vercel as a Serverless Function
+// Node 18+ 自带 fetch，无需额外导入
+
+// CORS headers - 允许跨域访问
+const CORS_HEADERS = {
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
+    'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+}
+
 export default async function handler(req, res) {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Credentials', true)
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    )
-
+    // 处理 CORS 预检请求
     if (req.method === 'OPTIONS') {
-        res.status(200).end()
+        res.status(200).set(CORS_HEADERS).end()
         return
     }
 
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' })
+        res.status(405).set({ 'Content-Type': 'application/json' }).json({ error: 'Method not allowed' })
+        return
     }
 
     try {
         const { faceImage, tongueImage } = req.body
 
         if (!faceImage || !tongueImage) {
-            return res.status(400).json({ error: 'Missing images' })
+            res.status(400).json({ error: 'Missing faceImage or tongueImage' })
+            return
         }
 
-        // Check for API Key
-        const apiKey = process.env.GEMINI_API_KEY
+        const apiKey = process.env.SILICONFLOW_API_KEY
 
-        // MOCK MODE: If no API key is present, return a simulated response
+        // MOCK 模式：无 API Key 时返回模拟数据
         if (!apiKey) {
-            console.log('No GEMINI_API_KEY found, returning mock response')
-            await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate delay
+            console.log('[望诊API] 未配置 SILICONFLOW_API_KEY，返回模拟数据')
+            await new Promise(resolve => setTimeout(resolve, 2000))
 
-            return res.status(200).json({
-                face: {
-                    color: '面色淡白',
-                    luster: '少泽',
-                    features: ['眼袋明显', '额头无痘']
-                },
-                tongue: {
-                    color: '舌质淡',
-                    coating: '苔白腻',
-                    shape: '边有齿痕'
-                },
+            res.status(200).set(CORS_HEADERS).json({
+                face: { color: '面色淡白', luster: '少泽', features: ['眼袋明显', '额头无痘'] },
+                tongue: { color: '舌质淡', coating: '苔白腻', shape: '边有齿痕' },
                 diagnosis: '脾虚湿盛',
                 advice: '检测结果显示您有脾虚湿盛的倾向。建议强健脾胃，祛湿化痰。饮食上宜清淡，少食生冷油腻，多食山药、薏米、赤小豆。作息上注意避免熬夜，适当运动以助阳气升发。'
             })
+            return
         }
 
-        // REAL MODE: Call Google Gemini
-        const genAI = new GoogleGenerativeAI(apiKey);
-        // Use gemini-1.5-flash for speed and multimodal capability, or gemini-pro-vision
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-        // Helper to convert base64 to Google Generative AI format
-        function fileToGenerativePart(base64Data, mimeType) {
-            // Remove header if present (e.g., "data:image/jpeg;base64,")
-            const base64Content = base64Data.split(',')[1] || base64Data;
-            return {
-                inlineData: {
-                    data: base64Content,
-                    mimeType
-                },
-            };
-        }
-
-        const facePart = fileToGenerativePart(faceImage, "image/jpeg");
-        const tonguePart = fileToGenerativePart(tongueImage, "image/jpeg");
+        // --- 真实模式：调用硅基流动 Qwen VL ---
+        const siliconFlowUrl = 'https://api.siliconflow.cn/v1/chat/completions'
 
         const prompt = `你是一位拥有30年临床经验的中医望诊专家。请根据用户提供的面部照片和舌象照片，严格按照以下标准进行专业分析。
 
@@ -104,8 +89,6 @@ export default async function handler(req, res) {
 
 ## 三、九种体质对应特征
 
-根据望诊特征，推断最接近的中医体质类型：
-
 1. **平和质**：面色红润有光泽，舌质淡红，舌苔薄白
 2. **气虚质**：面色㿠白或萎黄，少气懒言，舌淡胖有齿痕
 3. **阳虚质**：面色㿠白或晦暗，畏寒肢冷，舌淡胖嫩，苔白滑
@@ -118,40 +101,114 @@ export default async function handler(req, res) {
 
 ## 四、输出要求
 
-必须以严格JSON格式输出，不要任何markdown标记：
+严格以JSON格式输出，不要任何markdown标记：
 
 {
   "face": {
-    "color": "面色颜色（从青/赤/黄/白/黑/红润中选择最贴切的一个）",
+    "color": "面色颜色",
     "luster": "光泽度（得神/少神/失神）",
     "features": ["特征1", "特征2", "特征3"]
   },
   "tongue": {
-    "color": "舌质颜色（淡红/淡白/红/绛/青紫）",
-    "coating": "舌苔描述（如：薄白/黄腻/白厚腻/少苔等）",
-    "shape": "舌形描述（如：胖大边有齿痕/瘦薄/有裂纹等）"
+    "color": "舌质颜色",
+    "coating": "舌苔描述",
+    "shape": "舌形描述"
   },
-  "diagnosis": "从九种体质中选择最贴切的一种（平和质/气虚质/阳虚质/阴虚质/痰湿质/湿热质/血瘀质/气郁质/特禀质）",
-  "advice": "针对该体质的调理建议，包括饮食、起居、运动三方面，100-150字"
+  "diagnosis": "九种体质之一",
+  "advice": "调理建议，100-150字，包含饮食、起居、运动"
 }
 
 注意：
 1. 如果无法清晰判断，选择最接近的体质类型
 2. 特征描述要具体、专业、符合中医术语
-3. 严禁输出JSON以外的任何内容`,
+3. 严禁输出JSON以外的任何内容`
 
-        const result = await model.generateContent([prompt, facePart, tonguePart]);
-        const response = await result.response;
-        let text = response.text();
+        // 构建消息内容 - 第一张是面部，第二张是舌象
+        // Qwen VL 支持 base64 data URL 格式
+        const messages = [
+            {
+                role: 'user',
+                content: [
+                    {
+                        type: 'image_url',
+                        image_url: { url: normalizeBase64Image(faceImage), detail: 'high' }
+                    },
+                    {
+                        type: 'image_url',
+                        image_url: { url: normalizeBase64Image(tongueImage), detail: 'high' }
+                    },
+                    {
+                        type: 'text',
+                        text: `请分析上面两张图片：第一张是面部照片，第二张是舌象照片。\n\n${prompt}`
+                    }
+                ]
+            }
+        ]
 
-        // Clean up markdown code blocks if present
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const siliconResponse = await fetch(siliconFlowUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'Qwen/Qwen2.5-VL-72B-Instruct',
+                messages: messages,
+                temperature: 0.3,
+                max_tokens: 2048
+            })
+        })
 
-        const jsonResult = JSON.parse(text);
-        return res.status(200).json(jsonResult);
+        if (!siliconResponse.ok) {
+            const errText = await siliconResponse.text()
+            console.error('[望诊API] 硅基流动调用失败:', siliconResponse.status, errText)
+            res.status(500).set(CORS_HEADERS).json({ error: `AI服务调用失败: ${siliconResponse.status}` })
+            return
+        }
+
+        const result = await siliconResponse.json()
+        let text = result.choices?.[0]?.message?.content || ''
+
+        // 清理可能的 markdown 代码块
+        text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+
+        // 解析 JSON 结果
+        let jsonResult
+        try {
+            jsonResult = JSON.parse(text)
+        } catch (parseErr) {
+            console.error('[望诊API] JSON解析失败:', text)
+            // 尝试提取 JSON 部分
+            const jsonMatch = text.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+                jsonResult = JSON.parse(jsonMatch[0])
+            } else {
+                res.status(500).set(CORS_HEADERS).json({ error: 'AI返回格式解析失败' })
+                return
+            }
+        }
+
+        res.status(200).set(CORS_HEADERS).json(jsonResult)
 
     } catch (error) {
-        console.error('AI Analysis Error:', error)
-        return res.status(500).json({ error: 'Analysis failed: ' + error.message })
+        console.error('[望诊API] 错误:', error)
+        res.status(500).set(CORS_HEADERS).json({ error: 'Analysis failed: ' + error.message })
     }
+}
+
+/**
+ * 将 base64 数据标准化为 data URL 格式
+ * 支持的输入格式：
+ *   - "data:image/jpeg;base64,/9j/4AAQ..." (已有 data URL 头)
+ *   - "/9j/4AAQ..." (纯 base64 字符串，无头)
+ *   - "data:image/png;base64,iVBORw0..." (已有 PNG 头)
+ */
+function normalizeBase64Image(imageData) {
+    if (!imageData) return null
+    // 如果已经有 data URL 格式，直接返回
+    if (imageData.startsWith('data:')) {
+        return imageData
+    }
+    // 默认假设是 JPEG（移动端相机常用格式）
+    return `data:image/jpeg;base64,${imageData}`
 }
