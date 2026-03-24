@@ -50,6 +50,7 @@ export const handler = async (event, context) => {
         }
 
         const apiKey = process.env.SILICONFLOW_API_KEY
+        console.log('[望诊API] API Key 状态:', apiKey ? '已配置' : '未配置')
 
         // MOCK 模式：无 API Key 时返回模拟数据
         if (!apiKey) {
@@ -167,10 +168,12 @@ export const handler = async (event, context) => {
             body: JSON.stringify({
                 model: 'Qwen/Qwen2.5-VL-72B-Instruct',
                 messages: messages,
-                temperature: 0.3,
+                temperature: 0,  // 设为0保证结果最稳定
                 max_tokens: 2048
             })
         })
+
+        console.log('[望诊API] 硅基流动响应状态:', siliconResponse.status)
 
         if (!siliconResponse.ok) {
             const errText = await siliconResponse.text()
@@ -184,6 +187,7 @@ export const handler = async (event, context) => {
 
         const result = await siliconResponse.json()
         let text = result.choices?.[0]?.message?.content || ''
+        console.log('[望诊API] AI 分析结果:', result)
 
         text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
 

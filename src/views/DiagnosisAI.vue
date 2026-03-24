@@ -21,11 +21,23 @@ const startDiagnosis = () => {
 const handleFaceCapture = (image) => {
     faceImage.value = image
     step.value = 'capture-tongue'
+    // 显式停止摄像头，等下一个组件接管
+    setTimeout(() => stopAllCameras(), 100)
 }
 
 const handleTongueCapture = (image) => {
     tongueImage.value = image
     analyzeImages()
+    setTimeout(() => stopAllCameras(), 100)
+}
+
+const stopAllCameras = () => {
+    // 遍历所有摄像头轨道并停止
+    navigator.mediaDevices?.getUserMedia({ audio: false, video: true })
+        .then(stream => {
+            stream.getTracks().forEach(track => track.stop())
+        })
+        .catch(() => {})
 }
 
 

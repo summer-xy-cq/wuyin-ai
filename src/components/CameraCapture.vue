@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Camera, RefreshCw, Check, X } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -20,23 +20,67 @@ const canvasRef = ref(null)
 const stream = ref(null)
 const capturedImage = ref(null)
 const error = ref(null)
+const isLoading = ref(true)
 
 const startCamera = async () => {
-  try {
-    stream.value = await navigator.mediaDevices.getUserMedia({
+  // 先停掉当前组件的流（防止上一个步骤残留）
+  if (stream.value) {
+    stream.value.getTracks().forEach(t => t.stop())
+    stream.value = null
+  }
+
+  // 延迟 300ms，等上一个 CameraCapture 组件完全卸载后再请求摄像头
+  await new Promise(r => setTimeout(r, 300))
+
+  // 优先前置摄像头（自拍/舌诊场景，前置更方便）
+  const constraints = [
+    {
       audio: false,
       video: {
-        facingMode: 'user', // Front camera by default
+        facingMode: 'user',
         width: { ideal: 1280 },
         height: { ideal: 720 }
       }
-    })
-    if (videoRef.value) {
-      videoRef.value.srcObject = stream.value
+    },
+    {
+      audio: false,
+      video: {
+        facingMode: { exact: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
     }
-  } catch (err) {
-    console.error("Camera access error:", err)
-    error.value = "无法访问摄像头，请确保已授权访问权限。"
+  ]
+
+  for (const constraint of constraints) {
+    try {
+      stream.value = await navigator.mediaDevices.getUserMedia(constraint)
+      break
+    } catch (err) {
+      console.warn('[Camera] 此配置不可用，尝试下一个:', err.name)
+    }
+  }
+
+  if (!stream.value) {
+    error.value = "无法访问摄像头，请确保已授权访问权限，并在浏览器设置中允许摄像头访问。"
+    isLoading.value = false
+    return
+  }
+
+  // 等待 video 元素挂载完毕后再附加流
+  await nextTick()
+  if (videoRef.value) {
+    videoRef.value.srcObject = stream.value
+    // 主动播放，等播放就绪后再显示
+    try {
+      await videoRef.value.play()
+      isLoading.value = false
+    } catch (playErr) {
+      // 某些浏览器需要用户交互才能自动播放，改用 oncanplay
+      videoRef.value.oncanplay = () => {
+        isLoading.value = false
+      }
+    }
   }
 }
 
@@ -54,15 +98,19 @@ const capture = () => {
   const canvas = canvasRef.value
   const context = canvas.getContext('2d')
 
+  // 确保视频尺寸已就绪
+  if (!video.videoWidth || !video.videoHeight) {
+    console.warn('[Camera] 视频尺寸未就绪，延迟拍摄')
+    setTimeout(capture, 200)
+    return
+  }
+
   // Set canvas dimensions to match video
   canvas.width = video.videoWidth
   canvas.height = video.videoHeight
 
   // Draw video frame to canvas
-  // context.translate(canvas.width, 0);
-  // context.scale(-1, 1); // Mirror if using front camera, but usually we want true image for medical?
-  // Let's mirror it for UX so it feels like a mirror, then flip back? Or just keep it mirrored?
-  // User expects mirror behavior.
+  // 镜像处理（用户期望镜子效果）
   context.save()
   context.translate(canvas.width, 0)
   context.scale(-1, 1)
@@ -70,8 +118,6 @@ const capture = () => {
   context.restore()
 
   capturedImage.value = canvas.toDataURL('image/jpeg', 0.8)
-  // Stop camera to save battery/resource
-  // stopCamera() // Optional: keep running or stop? Usually stop to show static result.
 }
 
 const retake = () => {
@@ -106,13 +152,14 @@ onUnmounted(() => {
     <!-- Main Viewport -->
     <div class="flex-1 relative overflow-hidden flex items-center justify-center bg-black">
         <p v-if="error" class="text-white text-center px-6">{{ error }}</p>
+        <p v-else-if="isLoading" class="text-white/60 text-center px-6">正在启动摄像头...</p>
         
         <!-- Video Stream -->
-        <video 
-            v-show="!capturedImage"
-            ref="videoRef" 
-            autoplay 
-            playsinline 
+        <video
+            v-show="!isLoading && !capturedImage && !error"
+            ref="videoRef"
+            autoplay
+            playsinline
             class="absolute inset-0 w-full h-full object-cover transform -scale-x-100"
         ></video>
         
@@ -123,8 +170,8 @@ onUnmounted(() => {
             class="absolute inset-0 w-full h-full object-cover" 
         />
 
-        <!-- Overlays (Only show when not captured) -->
-        <div v-if="!capturedImage" class="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+        <!-- Overlays (Only show when camera ready and not captured) -->
+        <div v-if="!isLoading && !capturedImage && !error" class="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
             <!-- Face Guide -->
             <svg v-if="mode === 'face'" viewBox="0 0 100 100" class="w-[80%] h-[80%] opacity-50 drop-shadow-lg">
                 <ellipse cx="50" cy="45" rx="30" ry="40" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="4 2" />
@@ -134,13 +181,13 @@ onUnmounted(() => {
             </svg>
 
             <!-- Tongue Guide -->
-            <svg v-if="mode === 'tongue'" viewBox="0 0 100 100" class="w-[60%] h-[60%] opacity-50 drop-shadow-lg">
+            <svg v-if="mode === 'tongue'" viewBox="0 0 100 100" class="w-[80%] h-[80%] opacity-50 drop-shadow-lg">
                 <path d="M30,30 Q50,90 70,30 Q50,10 30,30" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="4 2" />
             </svg>
         </div>
         
         <!-- Instructions -->
-        <div v-if="!capturedImage" class="absolute bottom-32 left-0 right-0 text-center z-20 px-6">
+        <div v-if="!isLoading && !capturedImage && !error" class="absolute bottom-32 left-0 right-0 text-center z-20 px-6">
             <p class="text-white/90 text-sm bg-black/40 inline-block px-4 py-2 rounded-full backdrop-blur-sm">
                 {{ instructions || (mode === 'face' ? '请摘下眼镜，露出额头，保持光线充足' : '请自然伸出舌头，放松舌面，避免反光') }}
             </p>
@@ -149,7 +196,7 @@ onUnmounted(() => {
 
     <!-- Controls -->
     <div class="bg-black p-8 pb-12 flex justify-around items-center z-20">
-        <div v-if="!capturedImage" class="flex-1 flex justify-center">
+        <div v-if="!isLoading && !capturedImage" class="flex-1 flex justify-center">
              <!-- Capture Button -->
             <button 
                 @click="capture"
