@@ -1299,9 +1299,10 @@ const skipFeedback = () => {
                   </div>
                 </div>
                  <!-- Duration Display -->
-                <div class="flex justify-between mt-1.5 px-0.5">
-                   <span class="text-xs text-white/90 font-medium font-mono drop-shadow-md">{{ formatTime(currentTime) }}</span>
-                   <span class="text-xs text-white/90 font-medium font-mono drop-shadow-md">{{ formatTime(duration) }}</span>
+                <div class="flex justify-between items-center mt-2 px-0.5 bg-black/30 rounded px-2 py-1">
+                   <span class="text-sm text-white font-bold font-mono">{{ formatTime(currentTime) }}</span>
+                   <span class="text-sm text-white/50 font-mono">/</span>
+                   <span class="text-base text-white font-extrabold font-mono">{{ duration > 0 ? formatTime(duration) : '--:--' }}</span>
                 </div>
 
                 <!-- Volume Slider -->
