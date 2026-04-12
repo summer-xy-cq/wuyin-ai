@@ -59,6 +59,16 @@ const routes = [
         path: '/research',
         name: 'ResearchStudy',
         component: () => import('../views/ResearchStudy.vue')
+    },
+    {
+        path: '/creator',
+        name: 'MusicCreator',
+        component: () => import('../views/MusicCreator.vue')
+    },
+    {
+        path: '/music-library',
+        name: 'MusicLibrary',
+        component: () => import('../views/MusicLibrary.vue')
     }
 ]
 

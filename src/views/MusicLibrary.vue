@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Play, Pause, Music, Star, CheckCircle } from 'lucide-vue-next'
+import { ArrowLeft, Play, Pause, Music, Star, CheckCircle, Wand2 } from 'lucide-vue-next'
 import { CONSTITUTIONS, FIVE_TONES } from '../data/constitutions.js'
 import { storage } from '../utils/storage.js'
 
@@ -125,6 +125,22 @@ const formatDate = (timestamp) => {
     </header>
 
     <main class="max-w-lg mx-auto px-6 py-6 space-y-8">
+
+      <!-- AI 创作入口 -->
+      <div
+        @click="router.push('/creator')"
+        class="card p-4 flex items-center gap-4 cursor-pointer hover:scale-[1.01] active:scale-100 transition-all bg-gradient-to-r from-cinnabar/8 to-cinnabar/3 border border-cinnabar/20"
+      >
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cinnabar to-cinnabar-dark flex items-center justify-center shadow-lg shrink-0">
+          <Wand2 class="w-6 h-6 text-white" />
+        </div>
+        <div class="flex-1">
+          <div class="font-bold text-ink">五音创作器</div>
+          <div class="text-xs text-ink-light mt-0.5">自己谱写专属五音旋律</div>
+        </div>
+        <div class="text-cinnabar text-xs font-medium">创作 →</div>
+      </div>
+
       <!-- 按五音分类 -->
       <section 
         v-for="(toneGroup, index) in musicByTone" 

@@ -58,97 +58,14 @@ const currentTrackIndex = ref(0)
 const volume = ref(70)  // 音量 0-100
 const showVolumeSlider = ref(false)  // 是否显示音量滑块
 
-// 自由创作相关
-const showCreator = ref(false)  // 是否显示创作弹窗
-const creatorTone = ref('gong')  // 选择的音阶
-const creatorRhythm = ref('natural')  // 节奏：舒缓/自然/活跃
-const creatorVariation = ref('rich')  // 变化程度：简洁/丰富/随机
-const isCreatorMode = ref(false)  // 是否是创作模式
-const creatorEmotion = ref('')  // 选中的情绪
-const currentPlayingTone = ref('gong')  // 当前播放的音阶（用于显示）
-
-// 创作参数
-const creatorOptions = {
-  emotions: [
-    { key: 'anxiety', name: '焦虑', icon: '😰', tone: 'yu', toneName: '羽音', desc: '宁静安神', color: 'indigo' },
-    { key: 'anger', name: '愤怒', icon: '😠', tone: 'shang', toneName: '商音', desc: '肃降安定', color: 'slate' },
-    { key: 'sadness', name: '悲伤', icon: '😢', tone: 'zhi', toneName: '徵音', desc: '振奋提气', color: 'rose' },
-    { key: 'tired', name: '疲惫', icon: '😴', tone: 'gong', toneName: '宫音', desc: '健脾养气', color: 'amber' },
-    { key: 'excited', name: '兴奋', icon: '🤩', tone: 'jiao', toneName: '角音', desc: '疏肝平心', color: 'emerald' }
-  ],
-  tones: [
-    { key: 'gong', name: '宫', desc: '浑厚稳健', color: 'amber' },
-    { key: 'shang', name: '商', desc: '清亮肃静', color: 'slate' },
-    { key: 'jiao', name: '角', desc: '舒展生发', color: 'emerald' },
-    { key: 'zhi', name: '徵', desc: '热烈欢快', color: 'rose' },
-    { key: 'yu', name: '羽', desc: '深沉悠远', color: 'indigo' }
-  ],
-  rhythms: [
-    { key: 'slow', name: '舒缓', desc: '慢节奏，放松身心', icon: '🐢' },
-    { key: 'natural', name: '自然', desc: '中等节奏，舒适自然', icon: '🌊' },
-    { key: 'active', name: '活跃', desc: '轻快节奏，活力满满', icon: '🔥' }
-  ],
-  variations: [
-    { key: 'simple', name: '简洁', desc: '简单旋律，易于放松' },
-    { key: 'rich', name: '丰富', desc: '多层次变化，沉浸体验' },
-    { key: 'random', name: '随机', desc: '完全随机，每次不同' }
-  ]
-}
-
-// 智能推荐计算属性
-const creatorRecommendTone = computed(() => {
-  if (!creatorEmotion.value) return null
-  const emotion = creatorOptions.emotions.find(e => e.key === creatorEmotion.value)
-  return emotion
-})
-
-// 开始创作
-const startCreator = () => {
-  if (!isVip.value) {
-    showVipModal.value = true
-    return
-  }
-
-  isCreatorMode.value = true
-  musicType.value = 'ai'
-
-  // 使用选中的情绪对应的音阶，或者手动选择的音阶
-  let toneKey = creatorTone.value
-  if (creatorEmotion.value) {
-    const emotion = creatorOptions.emotions.find(e => e.key === creatorEmotion.value)
-    toneKey = emotion.tone
-  }
-
-  // 保存当前播放的音阶（用于显示）
-  currentPlayingTone.value = toneKey
-
-  console.log('[Result] 创作模式播放, toneKey:', toneKey, 'rhythm:', creatorRhythm.value, 'variation:', creatorVariation.value)
-  toneGenerator.playPentatonicWithOptions(toneKey, AI_MUSIC_DURATION, {
-    rhythm: creatorRhythm.value,
-    variation: creatorVariation.value
-  })
-
-  isPlaying.value = true
-  isAIGenerating.value = true
-  currentTime.value = 0
-  duration.value = AI_MUSIC_DURATION
-  startAIProgressTimer()
-
-  showCreator.value = false
-}
-
-// 关闭创作弹窗
-const closeCreator = () => {
-  showCreator.value = false
+// 跳转创作器（传递体质参数）
+const goToCreator = () => {
+  const constitutionKey = result.value?.primary?.key || 'pinghe'
+  router.push(`/creator?constitution=${constitutionKey}`)
 }
 
 // 显示的音阶名称
 const displayToneName = computed(() => {
-    if (isCreatorMode.value && currentPlayingTone.value) {
-        const toneMap = { gong: '宫', shang: '商', jiao: '角', zhi: '徵', yu: '羽' }
-        return toneMap[currentPlayingTone.value] || '宫'
-    }
-    // 其他模式：显示体质对应的音阶
     return result.value?.primary?.constitution?.toneName || '宫'
 })
 
@@ -253,14 +170,6 @@ const stopDrag = () => {
 // 动态背景
 const playerBgClass = computed(() => {
   if (!result.value) return 'from-emerald-800 via-teal-800 to-teal-900'
-
-  // 自由创作模式：使用当前播放的音阶
-  if (isCreatorMode.value && currentPlayingTone.value) {
-    const toneMap = { gong: '宫', shang: '商', jiao: '角', zhi: '徵', yu: '羽' }
-    const tone = toneMap[currentPlayingTone.value] || '宫'
-    return TONE_COLORS[tone] || 'from-emerald-800 via-teal-800 to-teal-900'
-  }
-
   const tone = result.value.primary.constitution.toneName
   return TONE_COLORS[tone] || 'from-emerald-800 via-teal-800 to-teal-900'
 })
@@ -271,14 +180,7 @@ const currentMusic = computed(() => {
 
   if (musicType.value === 'ai') {
     // AI音乐模式：返回虚拟音乐对象（实际用Web Audio API播放）
-    let toneKey
-    if (isCreatorMode.value && currentPlayingTone.value) {
-      // 自由创作模式：使用当前播放的音阶
-      toneKey = currentPlayingTone.value
-    } else {
-      // 普通AI模式：使用体质对应的音阶
-      toneKey = getToneByConstitution(result.value.primary.key)
-    }
+    const toneKey = getToneByConstitution(result.value.primary.key)
     const tone = TONE_FREQUENCIES[toneKey] || TONE_FREQUENCIES.gong
     return {
       title: `${tone.name}调养生音`,
@@ -420,31 +322,13 @@ const switchTrack = () => {
 const handleAiMusicClick = () => {
     if (isVip.value) {
         musicType.value = 'ai'
-        isCreatorMode.value = false
     } else {
         showVipModal.value = true
     }
 }
 
 const handleCreatorTabClick = () => {
-    if (!isVip.value) {
-        showVipModal.value = true
-        return
-    }
-    // 停止当前播放
-    if (isPlaying.value) {
-        if (musicType.value === 'ai') {
-            toneGenerator.stop()
-            stopAIProgressTimer()
-        } else if (audioPlayer.value) {
-            audioPlayer.value.pause()
-        }
-        isPlaying.value = false
-    }
-    isCreatorMode.value = true
-    musicType.value = 'ai'
-    // 显示创作弹窗
-    showCreator.value = true
+    goToCreator()
 }
 
 // 雷达图配置
@@ -733,21 +617,9 @@ const togglePlay = () => {
       stopAIProgressTimer()  // 停止更新进度
     } else {
       // 开始AI生成（全新的播放）
-      let toneKey
-      if (isCreatorMode.value) {
-        // 创作模式使用当前播放的音阶
-        toneKey = currentPlayingTone.value
-        console.log('[Result] 创作模式播放, toneKey:', toneKey, 'rhythm:', creatorRhythm.value, 'variation:', creatorVariation.value)
-        toneGenerator.playPentatonicWithOptions(toneKey, AI_MUSIC_DURATION, {
-          rhythm: creatorRhythm.value,
-          variation: creatorVariation.value
-        })
-      } else {
-        // 普通AI模式
-        toneKey = getToneByConstitution(result.value?.primary?.key || 'gong')
-        console.log('[Result] 播放AI音乐, toneKey:', toneKey)
-        toneGenerator.playPentatonic(toneKey, AI_MUSIC_DURATION)
-      }
+      const toneKey = getToneByConstitution(result.value?.primary?.key || 'gong')
+      console.log('[Result] 播放AI音乐, toneKey:', toneKey)
+      toneGenerator.playPentatonic(toneKey, AI_MUSIC_DURATION)
       isPlaying.value = true
       isAIGenerating.value = true
       // 启动AI音乐进度计时器
@@ -1177,7 +1049,7 @@ const skipFeedback = () => {
             <!-- Tab切换 -->
             <div class="flex bg-ink/5 rounded-lg p-1 mb-4">
               <button
-                @click="musicType = 'traditional'; isCreatorMode = false"
+                @click="musicType = 'traditional'"
                 class="flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md text-sm font-medium transition-all"
                 :class="musicType === 'traditional' ? 'bg-white text-ink shadow-sm' : 'text-ink-light'"
               >
@@ -1187,24 +1059,31 @@ const skipFeedback = () => {
               <button
                 @click="handleAiMusicClick"
                 class="flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md text-sm font-medium transition-all"
-                :class="musicType === 'ai' && !isCreatorMode ? 'bg-white text-ink shadow-sm' : 'text-ink-light'"
+                :class="musicType === 'ai' ? 'bg-white text-ink shadow-sm' : 'text-ink-light'"
               >
                 <Sparkles class="w-4 h-4" />
                 AI风格
-              </button>
-              <button
-                @click="handleCreatorTabClick"
-                class="flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-md text-sm font-medium transition-all"
-                :class="isCreatorMode ? 'bg-white text-ink shadow-sm' : 'text-ink-light'"
-              >
-                <Wand2 class="w-4 h-4" />
-                自由创作
               </button>
             </div>
             
             <p class="text-sm text-ink-light mb-4 leading-relaxed">
               {{ musicType === 'ai' ? currentMusic?.description : result.primary.constitution.musicDesc }}
             </p>
+
+            <!-- 五音创作器入口 -->
+            <div
+              @click="goToCreator"
+              class="mb-4 p-3 rounded-xl border-2 border-dashed border-cinnabar/30 bg-cinnabar/5 cursor-pointer hover:bg-cinnabar/10 hover:border-cinnabar/50 transition-all flex items-center gap-3"
+            >
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cinnabar to-cinnabar-dark flex items-center justify-center shrink-0">
+                <Wand2 class="w-5 h-5 text-white" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-ink text-sm">深度创作 · 五音创作器</div>
+                <div class="text-xs text-ink-light">根据体质推荐，自定义音调、情绪、时长，保存专属旋律</div>
+              </div>
+              <div class="text-cinnabar text-xs font-medium shrink-0">前往 →</div>
+            </div>
 
             <!-- 播放器 -->
             <div class="relative rounded-xl overflow-hidden transition-all duration-500">
@@ -1271,7 +1150,7 @@ const skipFeedback = () => {
                 <div class="flex-1 min-w-0">
                   <div class="font-bold truncate text-paper">{{ currentMusic?.title }}</div>
                   <div class="text-xs text-paper/70">
-                    {{ displayToneName }}调 · {{ isCreatorMode ? '自由创作' : (musicType === 'ai' ? 'AI合成' : '传统古曲') }}
+                    {{ displayToneName }}调 · {{ musicType === 'ai' ? 'AI合成' : '传统古曲' }}
                   </div>
                 </div>
                 
@@ -1481,106 +1360,5 @@ const skipFeedback = () => {
         </div>
       </div>
 
-      <!-- 自由创作弹窗（独立在最外层） -->
-      <div v-if="showCreator" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm">
-        <div class="bg-paper rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
-          <button @click="closeCreator" class="absolute top-2 right-2 text-ink-light hover:text-ink z-10">
-            <span class="text-xl">&times;</span>
-          </button>
-
-          <div class="p-4">
-            <div class="text-center mb-4">
-              <div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-jade to-emerald-500 rounded-full flex items-center justify-center">
-                <Wand2 class="w-6 h-6 text-white" />
-              </div>
-              <h3 class="text-lg font-bold text-ink">自由创作</h3>
-              <p class="text-xs text-ink-light">自定义你的专属养生音乐</p>
-            </div>
-
-            <div class="mb-3">
-              <div class="text-xs font-medium text-ink mb-1">选择情绪</div>
-              <div class="flex flex-wrap gap-1 justify-center">
-                <button
-                  v-for="emotion in creatorOptions.emotions"
-                  :key="emotion.key"
-                  @click="creatorEmotion = emotion.key; creatorTone = emotion.tone"
-                  class="py-1 px-2 rounded-lg text-xs"
-                  :class="creatorEmotion === emotion.key
-                    ? emotion.color === 'indigo' ? 'bg-indigo-500 text-white'
-                      : emotion.color === 'slate' ? 'bg-slate-500 text-white'
-                      : emotion.color === 'rose' ? 'bg-rose-500 text-white'
-                      : emotion.color === 'amber' ? 'bg-amber-500 text-white'
-                      : 'bg-emerald-500 text-white'
-                    : 'bg-ink/5 text-ink-light'"
-                >
-                  {{ emotion.icon }} {{ emotion.name }}
-                </button>
-              </div>
-            </div>
-
-            <div v-if="creatorRecommendTone" class="mb-3 p-2 rounded bg-jade/10 text-xs text-jade">
-              推荐: {{ creatorRecommendTone.toneName }} - {{ creatorRecommendTone.desc }}
-            </div>
-
-            <div class="mb-3">
-              <div class="text-xs font-medium text-ink mb-1">选择音阶</div>
-              <div class="grid grid-cols-5 gap-1">
-                <button
-                  v-for="tone in creatorOptions.tones"
-                  :key="tone.key"
-                  @click="creatorTone = tone.key; creatorEmotion = ''"
-                  class="py-1 rounded text-xs"
-                  :class="creatorTone === tone.key
-                    ? tone.color === 'amber' ? 'bg-amber-500 text-white'
-                      : tone.color === 'slate' ? 'bg-slate-500 text-white'
-                      : tone.color === 'emerald' ? 'bg-emerald-500 text-white'
-                      : tone.color === 'rose' ? 'bg-rose-500 text-white'
-                      : 'bg-indigo-500 text-white'
-                    : 'bg-ink/5 text-ink-light'"
-                >
-                  {{ tone.name }}
-                </button>
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <div class="text-xs font-medium text-ink mb-1">节奏</div>
-              <div class="flex gap-1">
-                <button
-                  v-for="rhythm in creatorOptions.rhythms"
-                  :key="rhythm.key"
-                  @click="creatorRhythm = rhythm.key"
-                  class="flex-1 py-1 rounded text-xs"
-                  :class="creatorRhythm === rhythm.key ? 'bg-emerald-500 text-white' : 'bg-ink/5 text-ink-light'"
-                >
-                  {{ rhythm.name }}
-                </button>
-              </div>
-            </div>
-
-            <div class="mb-4">
-              <div class="text-xs font-medium text-ink mb-1">变化</div>
-              <div class="flex gap-1">
-                <button
-                  v-for="variation in creatorOptions.variations"
-                  :key="variation.key"
-                  @click="creatorVariation = variation.key"
-                  class="flex-1 py-1 rounded text-xs"
-                  :class="creatorVariation === variation.key ? 'bg-sky-500 text-white' : 'bg-ink/5 text-ink-light'"
-                >
-                  {{ variation.name }}
-                </button>
-              </div>
-            </div>
-
-            <button
-              @click="startCreator"
-              class="w-full py-2 bg-gradient-to-r from-jade to-emerald-500 text-white rounded-lg text-sm"
-            >
-              开始创作体验
-            </button>
-          </div>
-        </div>
-      </div>
   </div>
 </template>
